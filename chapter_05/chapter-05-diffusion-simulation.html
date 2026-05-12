@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Diffusion & Osmosis Simulation — BSC 1005 Chapter 5</title>
+<style>
+:root {
+  --bg: #111827; --surface: #1f2937; --surface2: #374151;
+  --teal: #00C8B8; --teal-dim: rgba(0,200,184,0.12);
+  --amber: #C9903A; --text: #f3f4f6; --text-dim: #9ca3af;
+  --green: #4ade80; --red: #f87171; --blue: #60a5fa; --indigo: #818cf8;
+  --radius: 10px; --font: 'Segoe UI', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; display: flex; flex-direction: column; }
+.topbar { background: var(--surface); border-bottom: 2px solid rgba(0,200,184,0.25); padding: 10px 20px; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+.course-tag { font-size: .72rem; color: var(--teal); border: 1px solid var(--teal); padding: 3px 9px; border-radius: 4px; font-weight: 700; letter-spacing: .6px; white-space: nowrap; }
+.topbar h1 { font-size: 1.05rem; font-weight: 700; flex: 1; }
+.topbar h1 span { color: var(--teal); }
+.sim-badge { font-size: .7rem; background: rgba(201,144,58,.15); color: var(--amber); border: 1px solid var(--amber); padding: 3px 9px; border-radius: 4px; font-weight: 700; }
+.layout { flex: 1; display: flex; flex-direction: column; padding: 16px; gap: 12px; max-width: 1120px; margin: 0 auto; width: 100%; }
+.scenario-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.tab-btn { background: var(--surface); border: 1px solid var(--surface2); color: var(--text-dim); padding: 9px 18px; border-radius: 8px; cursor: pointer; font-family: var(--font); font-size: .88rem; font-weight: 600; transition: all .18s; }
+.tab-btn:hover { border-color: var(--teal); color: var(--teal); }
+.tab-btn.active { background: var(--teal-dim); border-color: var(--teal); color: var(--teal); }
+.content-row { display: grid; grid-template-columns: 1fr 270px; gap: 12px; flex: 1; min-height: 0; }
+.canvas-wrap { background: var(--surface); border: 1px solid var(--surface2); border-radius: var(--radius); overflow: hidden; position: relative; height: 430px; }
+#sim-canvas { display: block; width: 100%; height: 100%; }
+.sidebar { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.panel { background: var(--surface); border: 1px solid var(--surface2); border-radius: var(--radius); padding: 14px; flex-shrink: 0; }
+.panel h3 { font-size: .72rem; font-weight: 700; letter-spacing: .7px; color: var(--teal); text-transform: uppercase; margin-bottom: 11px; }
+.slider-group { margin-bottom: 11px; }
+.slider-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: .83rem; gap: 6px; }
+.slider-val { color: var(--teal); font-weight: 700; font-size: .88rem; min-width: 22px; text-align: right; }
+input[type=range] { width: 100%; -webkit-appearance: none; background: var(--surface2); border-radius: 3px; height: 5px; outline: none; cursor: pointer; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 15px; height: 15px; background: var(--teal); border-radius: 50%; cursor: pointer; }
+.btn-row { display: flex; gap: 7px; margin-top: 11px; }
+.btn { flex: 1; padding: 9px 6px; border-radius: 7px; cursor: pointer; font-family: var(--font); font-size: .85rem; font-weight: 700; border: none; transition: opacity .15s; }
+.btn-start { background: var(--teal); color: #111827; }
+.btn-start:hover { opacity: .82; }
+.btn-reset { background: var(--surface2); color: var(--text); }
+.btn-reset:hover { opacity: .75; }
+.stat-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--surface2); font-size: .83rem; }
+.stat-row:last-child { border-bottom: none; }
+.stat-lbl { color: var(--text-dim); }
+.stat-val { font-weight: 700; }
+.stat-val.teal { color: var(--teal); }
+.stat-val.amber { color: var(--amber); }
+.stat-val.green { color: var(--green); }
+#graph-canvas { width: 100%; height: 72px; display: block; border-radius: 6px; margin-top: 9px; background: rgba(0,0,0,.25); }
+.info-text { font-size: .82rem; line-height: 1.6; color: var(--text-dim); }
+.info-text strong { color: var(--text); }
+.vocab-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.vpill { background: var(--teal-dim); color: var(--teal); border: 1px solid rgba(0,200,184,.3); padding: 2px 8px; border-radius: 4px; font-size: .75rem; font-weight: 600; }
+.opt-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 9px; }
+.opt-btn { padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: .8rem; font-weight: 600; border: 1px solid var(--surface2); background: transparent; color: var(--text-dim); font-family: var(--font); transition: all .15s; }
+.opt-btn.active { background: var(--teal-dim); border-color: var(--teal); color: var(--teal); }
+.opt-btn:hover { border-color: var(--teal); }
+.hint-text { font-size: .8rem; color: var(--text-dim); line-height: 1.5; margin-top: 3px; }
+.statusbar { background: var(--surface); border: 1px solid var(--surface2); border-radius: var(--radius); padding: 9px 14px; display: flex; align-items: center; gap: 10px; font-size: .83rem; flex-shrink: 0; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); flex-shrink: 0; transition: background .3s; }
+.dot.running { background: var(--teal); animation: pulse 1.4s infinite; }
+.dot.equilibrium { background: var(--green); }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+.status-txt { color: var(--text-dim); }
+@media(max-width:700px) { .content-row{grid-template-columns:1fr} .canvas-wrap{height:280px} .sidebar{flex-direction:row;flex-wrap:wrap} .panel{flex:1 1 200px} }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="course-tag">BSC 1005</span>
+  <h1>Chapter 5 · <span>Diffusion &amp; Osmosis</span> Simulation</h1>
+  <span class="sim-badge">SIMULATION</span>
+</div>
+<div class="layout">
+  <div class="scenario-tabs">
+    <button class="tab-btn active" onclick="setScenario('diffusion',this)">Simple Diffusion</button>
+    <button class="tab-btn" onclick="setScenario('facilitated',this)">Facilitated Diffusion</button>
+    <button class="tab-btn" onclick="setScenario('osmosis',this)">Osmosis</button>
+    <button class="tab-btn" onclick="setScenario('tonicity',this)">Tonicity</button>
+  </div>
+  <div class="content-row">
+    <div class="canvas-wrap"><canvas id="sim-canvas"></canvas></div>
+    <div class="sidebar">
+      <div class="panel">
+        <h3>Controls</h3>
+        <div id="dyn-controls"></div>
+        <div class="btn-row">
+          <button class="btn btn-start" id="start-btn" onclick="toggleSim()">&#9654; Start</button>
+          <button class="btn btn-reset" onclick="resetSim()">&#8635; Reset</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Live Data</h3>
+        <div class="stat-row"><span class="stat-lbl" id="lbl-left">Left side</span><span class="stat-val teal" id="stat-left">—</span></div>
+        <div class="stat-row"><span class="stat-lbl" id="lbl-right">Right side</span><span class="stat-val amber" id="stat-right">—</span></div>
+        <div class="stat-row"><span class="stat-lbl">Net movement</span><span class="stat-val" id="stat-flow">—</span></div>
+        <div class="stat-row"><span class="stat-lbl">Status</span><span class="stat-val" id="stat-status">Paused</span></div>
+        <canvas id="graph-canvas"></canvas>
+      </div>
+      <div class="panel">
+        <h3>What's Happening</h3>
+        <div class="info-text" id="info-box"></div>
+      </div>
+    </div>
+  </div>
+  <div class="statusbar">
+    <div class="dot" id="status-dot"></div>
+    <span class="status-txt" id="status-msg">Set values above and press Start.</span>
+  </div>
+</div>
+<script>
+const canvas  = document.getElementById('sim-canvas');
+const ctx     = canvas.getContext('2d');
+const gCanvas = document.getElementById('graph-canvas');
+const gCtx    = gCanvas.getContext('2d');
+
+let scenario='diffusion', running=false, animId=null, particles=[];
+let frameCount=0, eqFrames=0, atEquilibrium=false;
+let graphData={left:[],right:[]};
+let tonicState='hypo', cellR=80, cellTargetR=80, tonicTick=0;
+const CELL_BASE_R=80;
+
+function resizeCanvas(){
+  const r=canvas.parentElement.getBoundingClientRect();
+  canvas.width=Math.round(r.width); canvas.height=Math.round(r.height);
+}
+window.addEventListener('resize',()=>{resizeCanvas(); if(!running) drawFrame();});
+
+function setScenario(s,btn){
+  scenario=s;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  resetSim(); buildControls(); buildInfo();
+}
+
+function buildControls(){
+  const dc=document.getElementById('dyn-controls');
+  if(scenario==='diffusion'){
+    dc.innerHTML=`
+      <div class="slider-group">
+        <div class="slider-label"><span style="color:var(--teal)">&#9679; Left concentration</span><span class="slider-val" id="sl-val">30</span></div>
+        <input type="range" id="sl-left" min="5" max="60" value="30" oninput="document.getElementById('sl-val').textContent=this.value">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span style="color:var(--amber)">&#9679; Right concentration</span><span class="slider-val" id="sr-val">5</span></div>
+        <input type="range" id="sl-right" min="0" max="60" value="5" oninput="document.getElementById('sr-val').textContent=this.value">
+      </div>`;
+  } else if(scenario==='facilitated'){
+    dc.innerHTML=`
+      <div class="slider-group">
+        <div class="slider-label"><span style="color:var(--teal)">&#9679; Left concentration</span><span class="slider-val" id="sl-val">30</span></div>
+        <input type="range" id="sl-left" min="5" max="60" value="30" oninput="document.getElementById('sl-val').textContent=this.value">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span style="color:var(--amber)">&#9679; Right concentration</span><span class="slider-val" id="sr-val">5</span></div>
+        <input type="range" id="sl-right" min="0" max="60" value="5" oninput="document.getElementById('sr-val').textContent=this.value">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span style="color:var(--indigo)">&#9646; Channel proteins</span><span class="slider-val" id="sc-val">4</span></div>
+        <input type="range" id="sl-ch" min="1" max="10" value="4" oninput="document.getElementById('sc-val').textContent=this.value">
+      </div>`;
+  } else if(scenario==='osmosis'){
+    dc.innerHTML=`
+      <div class="slider-group">
+        <div class="slider-label"><span style="color:var(--red)">&#9679; Solute on left side</span><span class="slider-val" id="ss-val">18</span></div>
+        <input type="range" id="sl-sol" min="2" max="35" value="18" oninput="document.getElementById('ss-val').textContent=this.value">
+      </div>
+      <div class="slider-group">
+        <div class="slider-label"><span style="color:var(--blue)">&#9679; Water molecules (total)</span><span class="slider-val" id="sw-val">40</span></div>
+        <input type="range" id="sl-wat" min="20" max="70" value="40" oninput="document.getElementById('sw-val').textContent=this.value">
+      </div>
+      <p class="hint-text" style="margin-top:6px;">
+        <span style="color:var(--red)">Solute</span> cannot cross. <span style="color:var(--blue)">Water</span> moves toward the high-solute side.
+      </p>`;
+  } else if(scenario==='tonicity'){
+    dc.innerHTML=`
+      <p class="hint-text" style="margin-bottom:8px;">Select a solution type. Watch the animal cell respond.</p>
+      <div class="opt-row">
+        <button class="opt-btn active" id="opt-hypo" onclick="setTonic('hypo',this)">Hypotonic</button>
+        <button class="opt-btn" id="opt-iso" onclick="setTonic('iso',this)">Isotonic</button>
+        <button class="opt-btn" id="opt-hyper" onclick="setTonic('hyper',this)">Hypertonic</button>
+      </div>
+      <p class="hint-text" id="tonic-desc"><strong style="color:var(--text)">Hypotonic:</strong> Less solute outside than inside. Water enters the cell by osmosis. The cell swells.</p>`;
+    tonicState='hypo';
+  }
+}
+
+function setTonic(type,btn){
+  tonicState=type;
+  document.querySelectorAll('.opt-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const d={
+    hypo:'<strong style="color:var(--text)">Hypotonic:</strong> Less solute outside. Water enters by osmosis. Cell swells.',
+    iso:'<strong style="color:var(--text)">Isotonic:</strong> Equal concentrations. No net water movement. Cell stays the same.',
+    hyper:'<strong style="color:var(--text)">Hypertonic:</strong> More solute outside. Water leaves by osmosis. Cell shrinks (crenation).'
+  };
+  document.getElementById('tonic-desc').innerHTML=d[type];
+  if(!running){cellTargetR={hypo:CELL_BASE_R*1.38,iso:CELL_BASE_R,hyper:CELL_BASE_R*0.62}[type];}
+}
+
+function buildInfo(){
+  const infos={
+    diffusion:{
+      text:`Molecules move <strong>down their concentration gradient</strong> — from high to low — until concentration equalizes. This is <strong>passive transport</strong>: no energy required. Watch the <span style="color:#00C8B8">teal</span> and <span style="color:#C9903A">amber</span> molecules mix as they spread. At equilibrium, molecules still cross — there is just no net change.`,
+      vocab:['Concentration gradient','Passive transport','Equilibrium','Brownian motion']
+    },
+    facilitated:{
+      text:`Molecules still move down their gradient, but can only cross through <strong>protein channels</strong> in the membrane. Fewer channels means slower transport. The membrane is <strong>selectively permeable</strong> — only certain molecules fit through.`,
+      vocab:['Channel protein','Selective permeability','Facilitated diffusion']
+    },
+    osmosis:{
+      text:`<strong>Osmosis</strong> is the diffusion of water across a selectively permeable membrane. Water moves toward the side with more solute — where water concentration is lower. Solute is too large to cross. Water starts evenly distributed — watch it accumulate on the left (high-solute) side.`,
+      vocab:['Osmosis','Solute','Semipermeable membrane','Water potential']
+    },
+    tonicity:{
+      text:`<strong>Tonicity</strong> describes how a solution affects cell volume through osmosis. The cell membrane is selectively permeable — water moves in or out depending on the relative solute concentration outside vs. inside.`,
+      vocab:['Tonicity','Hypotonic','Hypertonic','Isotonic','Crenation','Osmotic pressure']
+    }
+  };
+  const info=infos[scenario];
+  document.getElementById('info-box').innerHTML=`<p>${info.text}</p><div class="vocab-pills">${info.vocab.map(v=>`<span class="vpill">${v}</span>`).join('')}</div>`;
+}
+
+function spawnParticles(){
+  particles=[];
+  const W=canvas.width, H=canvas.height, mid=W/2;
+  function randX(side){ return side==='left'?12+Math.random()*(mid-24):mid+12+Math.random()*(mid-24); }
+  function randY(){ return 16+Math.random()*(H-32); }
+  function mkP(x,y,color,type,r){
+    const a=Math.random()*Math.PI*2;
+    // water particles in osmosis get higher initial speed for visible movement
+    const spd=(scenario==='osmosis'&&type==='water')?1.8+Math.random()*1.2:1.0+Math.random()*0.9;
+    return {x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,color,type,r};
+  }
+  if(scenario==='diffusion'||scenario==='facilitated'){
+    const nL=parseInt(document.getElementById('sl-left')?.value||30);
+    const nR=parseInt(document.getElementById('sl-right')?.value||5);
+    for(let i=0;i<nL;i++) particles.push(mkP(randX('left'),randY(),'#00C8B8','mol',5));
+    for(let i=0;i<nR;i++) particles.push(mkP(randX('right'),randY(),'#C9903A','mol',5));
+  } else if(scenario==='osmosis'){
+    const nS=parseInt(document.getElementById('sl-sol')?.value||18);
+    const nW=parseInt(document.getElementById('sl-wat')?.value||40);
+    for(let i=0;i<nS;i++) particles.push(mkP(randX('left'),randY(),'#f87171','solute',7));
+    // FIX: exact 50/50 water split so stats are consistent every run
+    const half=Math.floor(nW/2);
+    for(let i=0;i<half;i++)   particles.push(mkP(randX('left'), randY(),'#60a5fa','water',4));
+    for(let i=0;i<nW-half;i++) particles.push(mkP(randX('right'),randY(),'#60a5fa','water',4));
+  }
+  graphData={left:[],right:[]};
+  frameCount=0; eqFrames=0; atEquilibrium=false;
+  updateStats();
+}
+
+function getChannels(){
+  const n=parseInt(document.getElementById('sl-ch')?.value||4), H=canvas.height;
+  return Array.from({length:n},(_,i)=>(H/(n+1))*(i+1));
+}
+
+function loop(){
+  if(scenario==='tonicity') animateTonicity(); 
+  else { moveParticles(); recordGraph(); updateStats(); checkEquilibrium(); }
+  drawFrame();
+  frameCount++;
+  if(running) animId=requestAnimationFrame(loop);
+}
+
+function moveParticles(){
+  const W=canvas.width, H=canvas.height, mid=W/2;
+  const MAX_SPD=scenario==='osmosis'?3.5:2.4;
+  const channels=scenario==='facilitated'?getChannels():[];
+
+  // Precompute osmosis bias once per frame
+  let osmosBias=0.5;
+  if(scenario==='osmosis'){
+    const lS=particles.filter(p=>p.type==='solute'&&p.x<mid).length;
+    const rS=particles.filter(p=>p.type==='solute'&&p.x>=mid).length;
+    if(lS+rS>0){
+      osmosBias=0.35+0.5*(lS/(lS+rS));
+      osmosBias=Math.max(0.15,Math.min(0.92,osmosBias));
+    }
+  }
+
+  for(const p of particles){
+    const prevX=p.x;
+    p.vx+=(Math.random()-.5)*0.45;
+    p.vy+=(Math.random()-.5)*0.45;
+    const spd=Math.hypot(p.vx,p.vy);
+    if(spd>MAX_SPD){p.vx*=MAX_SPD/spd; p.vy*=MAX_SPD/spd;}
+    p.x+=p.vx; p.y+=p.vy;
+
+    // Wall bounce
+    if(p.x-p.r<1){p.x=p.r+1; p.vx=Math.abs(p.vx);}
+    if(p.x+p.r>W-1){p.x=W-p.r-1; p.vx=-Math.abs(p.vx);}
+    if(p.y-p.r<14){p.y=p.r+14; p.vy=Math.abs(p.vy);}
+    if(p.y+p.r>H-6){p.y=H-p.r-6; p.vy=-Math.abs(p.vy);}
+
+    const crossedMembrane=(prevX<mid)!==(p.x<mid);
+    if(crossedMembrane){
+      let allow=false;
+      if(scenario==='diffusion'){
+        // Fully permeable — net flux driven purely by particle count on each side
+        allow=true;
+      } else if(scenario==='facilitated'){
+        const nearCh=channels.some(cy=>Math.abs(p.y-cy)<14);
+        allow=nearCh&&Math.random()<0.75;
+      } else if(scenario==='osmosis'){
+        if(p.type==='solute'){
+          allow=false;
+        } else {
+          // Water: biased toward high-solute side (left)
+          const movingLeft=p.x<mid;
+          allow=movingLeft?Math.random()<osmosBias:Math.random()<(1-osmosBias);
+        }
+      }
+      if(!allow){
+        // Reflect back to originating side
+        p.x=p.x<mid?mid+p.r+1:mid-p.r-1;
+        p.vx*=-1;
+      }
+    }
+  }
+}
+
+function animateTonicity(){
+  const targets={hypo:CELL_BASE_R*1.38,iso:CELL_BASE_R,hyper:CELL_BASE_R*0.62};
+  cellTargetR=targets[tonicState];
+  const delta=cellTargetR-cellR;
+  if(Math.abs(delta)>0.3) cellR+=delta*0.035;
+  tonicTick++;
+  updateTonicStats();
+}
+
+function drawFrame(){
+  const W=canvas.width, H=canvas.height, mid=W/2;
+  ctx.clearRect(0,0,W,H);
+  if(scenario==='tonicity'){drawTonicity(W,H,mid); return;}
+
+  ctx.fillStyle='rgba(0,200,184,0.035)'; ctx.fillRect(0,0,mid,H);
+  ctx.fillStyle='rgba(201,144,58,0.035)'; ctx.fillRect(mid,0,mid,H);
+  ctx.font='11px Segoe UI,sans-serif';
+  ctx.fillStyle='rgba(0,200,184,0.45)'; ctx.fillText('Left',10,22);
+  ctx.fillStyle='rgba(201,144,58,0.45)'; ctx.fillText('Right',mid+10,22);
+  drawMembrane(mid,H);
+  // FIX: pass W into drawWaterLevels so it can draw the level lines correctly
+  if(scenario==='osmosis') drawWaterLevels(mid,H,W);
+  for(const p of particles){
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle=p.color; ctx.globalAlpha=0.88; ctx.fill(); ctx.globalAlpha=1;
+    ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=0.5; ctx.stroke();
+  }
+}
+
+function drawMembrane(mid,H){
+  ctx.save();
+  ctx.shadowColor='rgba(255,255,255,0.08)'; ctx.shadowBlur=6;
+  ctx.strokeStyle='rgba(255,255,255,0.14)'; ctx.lineWidth=9;
+  ctx.beginPath(); ctx.moveTo(mid,0); ctx.lineTo(mid,H); ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1.5;
+  ctx.setLineDash([5,5]);
+  [mid-3.5,mid+3.5].forEach(x=>{ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();});
+  ctx.setLineDash([]);
+  ctx.save(); ctx.translate(mid,H/2); ctx.rotate(-Math.PI/2);
+  ctx.font='9px Segoe UI,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.22)'; ctx.textAlign='center';
+  ctx.fillText('CELL MEMBRANE',0,-12); ctx.restore();
+  if(scenario==='facilitated'){
+    const chs=getChannels();
+    for(const cy of chs){
+      ctx.fillStyle='#818cf8'; ctx.beginPath(); ctx.rect(mid-8,cy-18,16,36); ctx.fill();
+      ctx.fillStyle='rgba(17,24,39,0.75)'; ctx.beginPath(); ctx.rect(mid-4,cy-11,8,22); ctx.fill();
+      ctx.font='8px Segoe UI,sans-serif'; ctx.fillStyle='rgba(129,140,248,0.6)'; ctx.textAlign='center';
+      ctx.fillText('Ch',mid,cy+28);
+    }
+    ctx.textAlign='left';
+  }
+}
+
+// FIX: W is now a parameter — was previously undefined (caused ReferenceError that killed rendering)
+function drawWaterLevels(mid,H,W){
+  const leftW=particles.filter(p=>p.type==='water'&&p.x<mid).length;
+  const rightW=particles.filter(p=>p.type==='water'&&p.x>=mid).length;
+  const total=leftW+rightW;
+  if(!total) return;
+  const lPct=leftW/total, rPct=rightW/total;
+  const lY=H*(1-lPct*0.85), rY=H*(1-rPct*0.85);
+  ctx.fillStyle='rgba(96,165,250,0.07)';
+  ctx.fillRect(2,lY,mid-4,H-lY); ctx.fillRect(mid+2,rY,mid-4,H-rY);
+  ctx.strokeStyle='rgba(96,165,250,0.35)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
+  ctx.beginPath();
+  ctx.moveTo(3,lY); ctx.lineTo(mid-3,lY);
+  ctx.moveTo(mid+3,rY); ctx.lineTo(W-3,rY);
+  ctx.stroke(); ctx.setLineDash([]);
+}
+
+function drawTonicity(W,H,mid){
+  const cx=mid, cy=H/2;
+  const bgC={hypo:'rgba(96,165,250,0.04)',iso:'rgba(255,255,255,0.03)',hyper:'rgba(248,113,113,0.06)'};
+  ctx.fillStyle=bgC[tonicState]; ctx.fillRect(0,0,W,H);
+  const sCount={hypo:5,iso:14,hyper:28};
+  const n=sCount[tonicState];
+  ctx.globalAlpha=0.32; ctx.fillStyle='#f87171';
+  for(let i=0;i<n;i++){
+    const ba=(i/n)*Math.PI*2, dr=tonicTick*0.003+i*0.7;
+    const rx=100+(i%4)*42, ry=70+(i%3)*28;
+    const sx=cx+Math.cos(ba+dr)*rx, sy=cy+Math.sin(ba*0.8+dr*0.6)*ry;
+    if(Math.hypot(sx-cx,sy-cy)>cellR+10){ctx.beginPath(); ctx.arc(sx,sy,5,0,Math.PI*2); ctx.fill();}
+  }
+  ctx.globalAlpha=1;
+  const grad=ctx.createRadialGradient(cx,cy,cellR*0.1,cx,cy,cellR);
+  grad.addColorStop(0,'rgba(0,200,184,0.14)'); grad.addColorStop(1,'rgba(0,200,184,0.03)');
+  ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(cx,cy,cellR,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#00C8B8'; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.arc(cx,cy,cellR,0,Math.PI*2); ctx.stroke();
+  ctx.textAlign='center';
+  ctx.font='bold 13px Segoe UI,sans-serif'; ctx.fillStyle='rgba(0,200,184,0.65)'; ctx.fillText('Animal Cell',cx,cy-6);
+  ctx.font='11px Segoe UI,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.38)'; ctx.fillText('r = '+Math.round(cellR)+' units',cx,cy+12);
+  drawTonicArrows(cx,cy);
+  const sStyle={hypo:['#60a5fa','HYPOTONIC'],iso:['#4ade80','ISOTONIC'],hyper:['#f87171','HYPERTONIC']};
+  const [sc,sl]=sStyle[tonicState];
+  ctx.font='bold 14px Segoe UI,sans-serif'; ctx.fillStyle=sc; ctx.fillText(sl+' SOLUTION',mid,28);
+  ctx.font='11px Segoe UI,sans-serif'; ctx.fillStyle='rgba(255,255,255,0.4)';
+  const sub={hypo:'Water entering cell',iso:'No net water flow',hyper:'Water leaving cell'};
+  ctx.fillText(sub[tonicState],mid,46); ctx.textAlign='left';
+}
+
+function drawTonicArrows(cx,cy){
+  const cfg={hypo:{color:'#60a5fa',inward:true,outward:false,n:6},iso:{color:'#4ade80',inward:true,outward:true,n:4},hyper:{color:'#f87171',inward:false,outward:true,n:6}};
+  const c=cfg[tonicState];
+  ctx.strokeStyle=ctx.fillStyle=c.color; ctx.globalAlpha=0.55; ctx.lineWidth=1.6;
+  for(let i=0;i<c.n;i++){
+    const ba=(i/c.n)*Math.PI*2+tonicTick*0.012;
+    if(c.inward) drawArrow(cx+Math.cos(ba)*(cellR+32),cy+Math.sin(ba)*(cellR+32),cx+Math.cos(ba)*(cellR+9),cy+Math.sin(ba)*(cellR+9));
+    const oa=ba+Math.PI/c.n;
+    if(c.outward) drawArrow(cx+Math.cos(oa)*(cellR+9),cy+Math.sin(oa)*(cellR+9),cx+Math.cos(oa)*(cellR+32),cy+Math.sin(oa)*(cellR+32));
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawArrow(x1,y1,x2,y2){
+  const a=Math.atan2(y2-y1,x2-x1),L=7;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-L*Math.cos(a-0.42),y2-L*Math.sin(a-0.42));
+  ctx.lineTo(x2-L*Math.cos(a+0.42),y2-L*Math.sin(a+0.42));
+  ctx.closePath(); ctx.fill();
+}
+
+function countSides(){
+  const mid=canvas.width/2;
+  if(scenario==='osmosis'){
+    return {left:particles.filter(p=>p.type==='water'&&p.x<mid).length, right:particles.filter(p=>p.type==='water'&&p.x>=mid).length};
+  }
+  return {left:particles.filter(p=>p.x<mid).length, right:particles.filter(p=>p.x>=mid).length};
+}
+
+function updateStats(){
+  if(scenario==='tonicity') return;
+  const {left,right}=countSides(), total=left+right;
+  const lp=total?Math.round(left/total*100):50;
+  document.getElementById('lbl-left').textContent=scenario==='osmosis'?'Left (water)':'Left side';
+  document.getElementById('lbl-right').textContent=scenario==='osmosis'?'Right (water)':'Right side';
+  document.getElementById('stat-left').textContent=`${left} (${lp}%)`;
+  document.getElementById('stat-right').textContent=`${right} (${100-lp}%)`;
+  const diff=left-right, flowEl=document.getElementById('stat-flow');
+  if(Math.abs(diff)<=3){flowEl.textContent='≈ Equilibrium'; flowEl.className='stat-val green';}
+  else{flowEl.textContent=diff>0?'→ Rightward':'← Leftward'; flowEl.className='stat-val';}
+  document.getElementById('stat-status').textContent=running?'Running':'Paused';
+}
+
+function updateTonicStats(){
+  document.getElementById('lbl-left').textContent='Solution type';
+  document.getElementById('lbl-right').textContent='Cell size';
+  const lbl={hypo:'Hypotonic',iso:'Isotonic',hyper:'Hypertonic'};
+  const flw={hypo:'→ Into cell',iso:'≈ No net flow',hyper:'→ Out of cell'};
+  document.getElementById('stat-left').textContent=lbl[tonicState];
+  document.getElementById('stat-right').textContent=Math.round(cellR/CELL_BASE_R*100)+'% of normal';
+  document.getElementById('stat-flow').textContent=flw[tonicState];
+  document.getElementById('stat-flow').className='stat-val';
+  document.getElementById('stat-status').textContent=running?'Animating':'Paused';
+}
+
+function recordGraph(){
+  if(frameCount%8!==0) return;
+  const {left,right}=countSides(), total=left+right;
+  graphData.left.push(total?left/total:0.5);
+  graphData.right.push(total?right/total:0.5);
+  if(graphData.left.length>55){graphData.left.shift(); graphData.right.shift();}
+  paintGraph();
+}
+
+function paintGraph(){
+  gCanvas.width=gCanvas.offsetWidth; gCanvas.height=72;
+  const W=gCanvas.width, H=gCanvas.height;
+  gCtx.clearRect(0,0,W,H); gCtx.fillStyle='rgba(0,0,0,0.22)'; gCtx.fillRect(0,0,W,H);
+  gCtx.strokeStyle='rgba(255,255,255,0.09)'; gCtx.lineWidth=1; gCtx.setLineDash([3,3]);
+  gCtx.beginPath(); gCtx.moveTo(0,H/2); gCtx.lineTo(W,H/2); gCtx.stroke(); gCtx.setLineDash([]);
+  const pts=graphData.left; if(pts.length<2) return;
+  const dx=W/(pts.length-1);
+  const dl=(data,color)=>{gCtx.strokeStyle=color; gCtx.lineWidth=1.5; gCtx.beginPath(); data.forEach((v,i)=>{const x=i*dx,y=H-v*H; i===0?gCtx.moveTo(x,y):gCtx.lineTo(x,y);}); gCtx.stroke();};
+  dl(graphData.left,'#00C8B8'); dl(graphData.right,'#C9903A');
+  gCtx.font='9px Segoe UI,sans-serif';
+  gCtx.fillStyle='rgba(0,200,184,0.65)'; gCtx.fillText('Left',3,11);
+  gCtx.fillStyle='rgba(201,144,58,0.65)'; gCtx.fillText('Right',3,H-3);
+}
+
+function checkEquilibrium(){
+  const {left,right}=countSides(), total=left+right;
+  if(!total) return;
+  if(Math.abs(left-right)/total<0.08){
+    eqFrames++;
+    if(eqFrames>70&&!atEquilibrium){
+      atEquilibrium=true;
+      setStatus('equilibrium','✓ Equilibrium reached — molecules still cross, but there is no net change in concentration.');
+    }
+  } else {eqFrames=0; atEquilibrium=false;}
+}
+
+function toggleSim(){
+  if(!running){
+    if(frameCount===0) spawnParticles();
+    if(scenario==='tonicity'){cellTargetR={hypo:CELL_BASE_R*1.38,iso:CELL_BASE_R,hyper:CELL_BASE_R*0.62}[tonicState];}
+    running=true;
+    document.getElementById('start-btn').textContent='⏸ Pause';
+    setStatus('running','Simulation running…');
+    animId=requestAnimationFrame(loop);
+  } else {
+    running=false;
+    document.getElementById('start-btn').textContent='▶ Resume';
+    setStatus('','Paused. Press Resume to continue.');
+    cancelAnimationFrame(animId);
+  }
+}
+
+function resetSim(){
+  running=false; cancelAnimationFrame(animId);
+  particles=[]; graphData={left:[],right:[]};
+  frameCount=0; eqFrames=0; atEquilibrium=false;
+  cellR=CELL_BASE_R; cellTargetR=CELL_BASE_R; tonicTick=0;
+  document.getElementById('start-btn').textContent='▶ Start';
+  document.getElementById('stat-left').textContent='—';
+  document.getElementById('stat-right').textContent='—';
+  document.getElementById('stat-flow').textContent='—';
+  document.getElementById('stat-flow').className='stat-val';
+  document.getElementById('stat-status').textContent='Paused';
+  setStatus('','Set values above and press Start.');
+  resizeCanvas();
+  gCanvas.width=gCanvas.offsetWidth; gCanvas.height=72; gCtx.clearRect(0,0,gCanvas.width,72);
+  drawFrame();
+}
+
+function setStatus(state,msg){
+  document.getElementById('status-dot').className='dot'+(state?' '+state:'');
+  document.getElementById('status-msg').textContent=msg;
+}
+
+window.addEventListener('load',()=>{resizeCanvas(); buildControls(); buildInfo(); drawFrame();});
+</script>
+</body>
+</html>
