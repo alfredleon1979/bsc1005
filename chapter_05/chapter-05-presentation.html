@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Working Cell — BSC 1005</title>
+<style>
+  :root {
+    --bg: #111827; --surface: #1F2937; --surface-2: #374151;
+    --teal: #00C8B8; --amber: #C9903A; --text: #F9FAFB; --muted: #9CA3AF;
+    --border: #374151; --radius: 10px;
+    --blue: #60a5fa; --pink: #f472b6; --green: #4ade80;
+    --orange: #fb923c; --red: #f87171; --yellow: #fbbf24;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); height:100vh; overflow:hidden; display:flex; flex-direction:column; }
+
+  /* ── TOP BAR ── */
+  #topbar { background:var(--surface); border-bottom:1px solid var(--border); padding:0 24px; height:48px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0; gap:16px; }
+  #course-id { font-size:0.72rem; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--teal); white-space:nowrap; }
+  #slide-meta { text-align:center; flex:1; min-width:0; }
+  #slide-meta .sname { color:var(--text); font-size:0.82rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .topbar-right { display:flex; align-items:center; gap:12px; flex-shrink:0; }
+  #scount { font-size:0.82rem; color:var(--muted); white-space:nowrap; }
+  #mode-badge { font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; padding:3px 9px; border-radius:20px; background:rgba(0,200,184,0.15); color:var(--teal); border:1px solid rgba(0,200,184,0.3); }
+  body.lecture #mode-badge { background:rgba(201,144,58,0.15); color:var(--amber); border-color:rgba(201,144,58,0.3); }
+
+  /* ── BUTTONS ── */
+  .btn { background:var(--surface-2); color:var(--text); border:1px solid var(--border); padding:6px 14px; border-radius:6px; cursor:pointer; font-size:0.8rem; font-family:inherit; transition:all 0.15s; white-space:nowrap; }
+  .btn:hover { background:var(--teal); color:#000; border-color:var(--teal); }
+  .btn:disabled { opacity:0.3; cursor:not-allowed; pointer-events:none; }
+  .btn-amber { border-color:var(--amber); color:var(--amber); background:transparent; }
+  .btn-amber:hover { background:var(--amber); color:#000; border-color:var(--amber); }
+  .btn-sm { padding:5px 12px; font-size:0.75rem; }
+  .btn-teal { background:var(--teal); color:#000; border-color:var(--teal); }
+  .btn-teal:hover { background:#00a89a; border-color:#00a89a; color:#000; }
+
+  /* ── PROGRESS ── */
+  #progress { height:3px; background:var(--border); flex-shrink:0; }
+  #progress-fill { height:100%; background:var(--teal); transition:width 0.3s ease; }
+
+  /* ── DECK ── */
+  #deck { flex:1; overflow:hidden; position:relative; }
+  .slide { position:absolute; inset:0; overflow-y:auto; padding:34px 54px; display:none; flex-direction:column; animation:fadeUp 0.25s ease; }
+  .slide.active { display:flex; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ── TITLE SLIDE ── */
+  .title-slide { justify-content:center; align-items:center; text-align:center; gap:0; padding:28px 48px; }
+  .title-slide .course-tag { font-size:0.72rem; font-weight:700; letter-spacing:2.5px; text-transform:uppercase; color:var(--teal); margin-bottom:16px; }
+  .title-slide h1 { font-size:2.9rem; line-height:1.15; color:var(--text); margin-bottom:12px; }
+  .title-slide h1 span { color:var(--teal); }
+  .title-slide .subtitle { color:var(--muted); font-size:0.98rem; margin-bottom:28px; max-width:500px; }
+  .pills { display:flex; flex-wrap:wrap; gap:9px; justify-content:center; margin-bottom:28px; max-width:660px; }
+  .pill { border:1px solid var(--surface-2); border-radius:999px; padding:8px 20px; font-size:0.83rem; color:var(--text); background:transparent; transition:all 0.2s; cursor:pointer; }
+  .pill:hover { border-color:var(--teal); color:var(--teal); background:rgba(0,200,184,0.08); }
+  .title-footer { display:flex; flex-direction:column; align-items:center; gap:5px; margin-top:10px; }
+  .author-line { font-size:0.79rem; color:var(--muted); }
+  .author-line span { color:var(--amber); font-weight:600; }
+
+  /* ── SLIDE HEADER ── */
+  .slide-head { border-bottom:2px solid var(--teal); padding-bottom:11px; margin-bottom:24px; flex-shrink:0; display:flex; align-items:flex-end; justify-content:space-between; }
+  .slide-head .section-tag { font-size:0.68rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--amber); margin-bottom:5px; }
+  .slide-head h2 { font-size:1.78rem; color:var(--text); }
+  .back-btn-wrap { flex-shrink:0; margin-bottom:3px; }
+
+  /* ── LAYOUT ── */
+  .cols { display:flex; gap:26px; flex:1; min-height:0; }
+  .col-main { flex:1; min-width:0; }
+  .col-side { width:310px; flex-shrink:0; display:flex; flex-direction:column; gap:13px; }
+  .full { flex:1; }
+
+  /* ── IMAGE SLOT ── */
+  .img-slot { background:var(--surface); border:2px dashed var(--teal); border-radius:var(--radius); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; text-align:center; min-height:180px; position:relative; gap:5px; }
+  .img-slot .badge { position:absolute; top:7px; right:7px; background:var(--amber); color:#000; font-size:0.58rem; font-weight:700; padding:2px 8px; border-radius:20px; text-transform:uppercase; }
+  .img-slot .slot-icon { font-size:1.8rem; opacity:0.28; }
+  .img-slot .slot-label { color:var(--teal); font-weight:700; font-size:0.68rem; text-transform:uppercase; letter-spacing:1px; }
+  .img-slot .slot-desc { color:var(--muted); font-size:0.73rem; line-height:1.5; max-width:220px; }
+  .img-slot .copy { font-size:0.62rem; color:var(--surface-2); margin-top:3px; border-top:1px solid var(--border); padding-top:5px; width:100%; text-align:center; }
+
+  /* ── TYPOGRAPHY ── */
+  p.body { font-size:0.9rem; line-height:1.85; color:var(--text); margin-bottom:13px; }
+  p.body:last-child { margin-bottom:0; }
+  .hint { font-size:0.71rem; color:var(--muted); font-style:italic; margin-top:4px; }
+
+  /* Tooltip terms */
+  .key { color:var(--amber); font-weight:700; cursor:help; border-bottom:1px dashed var(--amber); position:relative; }
+  .key::after { content:attr(data-tip); position:absolute; bottom:130%; left:50%; transform:translateX(-50%); background:#000; border:1px solid var(--teal); color:var(--text); padding:7px 11px; border-radius:6px; font-size:0.74rem; white-space:normal; max-width:250px; width:max-content; z-index:200; pointer-events:none; display:none; font-weight:400; }
+  .key:hover::after { display:block; }
+
+  /* Interaction guide */
+  .ig { display:flex; align-items:center; gap:9px; background:rgba(0,200,184,0.06); border:1px solid rgba(0,200,184,0.22); border-radius:8px; padding:9px 13px; margin-bottom:13px; font-size:0.77rem; color:var(--muted); }
+  .ig .icon { font-size:1rem; flex-shrink:0; }
+  .ig strong { color:var(--teal); }
+
+  /* ── CARDS ── */
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+  .card h4 { margin-bottom:9px; font-size:0.92rem; }
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:13px; }
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:13px; }
+  .grid-4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:11px; }
+
+  /* ── CALLOUT ── */
+  .callout { background:rgba(0,200,184,0.07); border-left:3px solid var(--teal); border-radius:0 var(--radius) var(--radius) 0; padding:12px 16px; margin-bottom:13px; }
+  .callout .cl { font-size:0.66rem; text-transform:uppercase; letter-spacing:1px; color:var(--teal); font-weight:700; margin-bottom:5px; }
+  .callout p { font-size:0.86rem; line-height:1.75; color:var(--text); }
+  .callout-amber { background:rgba(201,144,58,0.07); border-left-color:var(--amber); }
+  .callout-amber .cl { color:var(--amber); }
+
+  /* ── EXPANDABLE ── */
+  .expand { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:9px; overflow:hidden; cursor:pointer; transition:border-color 0.15s; }
+  .expand:hover,.expand.open { border-color:var(--teal); }
+  .expand-head { padding:11px 16px; display:flex; align-items:center; justify-content:space-between; }
+  .expand-head h4 { color:var(--teal); font-size:0.87rem; }
+  .expand-icon { color:var(--teal); font-size:1.05rem; transition:transform 0.2s; flex-shrink:0; }
+  .expand.open .expand-icon { transform:rotate(45deg); }
+  .expand-body { max-height:0; overflow:hidden; transition:max-height 0.3s ease,padding 0.2s; padding:0 16px; }
+  .expand.open .expand-body { max-height:600px; padding:0 16px 13px; }
+  .expand-body p { color:var(--muted); font-size:0.84rem; line-height:1.75; }
+
+  /* ── TABS ── */
+  .tabs { display:flex; gap:2px; border-bottom:1px solid var(--border); margin-bottom:16px; }
+  .tab-btn { padding:8px 17px; background:transparent; border:none; color:var(--muted); cursor:pointer; font-size:0.84rem; font-family:inherit; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all 0.15s; }
+  .tab-btn.active { color:var(--teal); border-bottom-color:var(--teal); }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; animation:fadeUp 0.2s ease; }
+  .tab-content-box { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; font-size:0.86rem; line-height:1.8; color:var(--text); }
+
+  /* ── STEPPER (enzyme stages) ── */
+  .stepper { background:var(--surface); border:1px solid var(--teal); border-radius:var(--radius); padding:18px; }
+  .stepper-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .step-dots { display:flex; gap:6px; }
+  .sdot { width:8px; height:8px; border-radius:50%; background:var(--border); transition:all 0.2s; }
+  .sdot.active { background:var(--teal); transform:scale(1.4); }
+  .stepper-body { min-height:100px; }
+  .stepper-body h4 { color:var(--teal); font-size:0.95rem; margin-bottom:8px; }
+  .stepper-body p { color:var(--text); font-size:0.86rem; line-height:1.75; }
+  .stepper-footer { display:flex; align-items:center; justify-content:space-between; margin-top:14px; }
+  .step-counter { font-size:0.75rem; color:var(--muted); }
+
+  /* ── ATP CYCLE VISUAL ── */
+  .atp-cycle { display:grid; grid-template-columns:1fr auto 1fr; grid-template-rows:auto auto auto; gap:0; align-items:center; justify-items:center; margin:20px 0; }
+  .cycle-node { background:var(--surface); border:2px solid var(--border); border-radius:var(--radius); padding:14px 18px; text-align:center; cursor:pointer; transition:all 0.2s; min-width:130px; }
+  .cycle-node:hover,.cycle-node.active { border-color:var(--teal); background:rgba(0,200,184,0.08); }
+  .cycle-node .cn-title { font-size:1.1rem; font-weight:700; color:var(--teal); }
+  .cycle-node .cn-sub { font-size:0.72rem; color:var(--muted); margin-top:3px; }
+  .cycle-arrow { font-size:1.4rem; color:var(--muted); text-align:center; padding:4px 8px; }
+  .cycle-label { font-size:0.76rem; color:var(--amber); text-align:center; padding:4px 12px; max-width:160px; line-height:1.4; font-style:italic; }
+  .cycle-detail { grid-column:1/-1; background:rgba(0,200,184,0.07); border:1px solid rgba(0,200,184,0.25); border-radius:8px; padding:12px 16px; margin-top:10px; font-size:0.84rem; color:var(--text); line-height:1.7; min-height:52px; }
+
+  /* ── TONICITY TOGGLE ── */
+  .tonic-toggle { display:flex; gap:8px; margin-bottom:16px; }
+  .tonic-btn { flex:1; padding:10px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-family:inherit; font-size:0.86rem; color:var(--muted); transition:all 0.15s; }
+  .tonic-btn.active { background:rgba(0,200,184,0.1); border-color:var(--teal); color:var(--teal); font-weight:600; }
+  .tonic-panel { display:none; }
+  .tonic-panel.active { display:block; animation:fadeUp 0.2s ease; }
+  .tonic-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:10px; }
+  .tonic-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px; text-align:center; }
+  .tonic-card .tc-label { font-size:0.68rem; text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:8px; }
+  .tonic-card.iso .tc-label { color:var(--blue); }
+  .tonic-card.hypo .tc-label { color:var(--green); }
+  .tonic-card.hyper .tc-label { color:var(--red); }
+  .tonic-card .tc-cell { font-size:2.2rem; margin:8px 0; }
+  .tonic-card .tc-desc { font-size:0.78rem; color:var(--muted); line-height:1.55; }
+  .tonic-card .tc-result { font-size:0.8rem; margin-top:8px; font-weight:600; }
+  .tonic-card.iso .tc-result { color:var(--blue); }
+  .tonic-card.hypo .tc-result { color:var(--green); }
+  .tonic-card.hyper .tc-result { color:var(--red); }
+
+  /* Diffusion visual */
+  .diff-visual { display:flex; gap:0; align-items:stretch; margin:16px 0; border-radius:var(--radius); overflow:hidden; border:1px solid var(--border); }
+  .diff-side { flex:1; padding:16px; text-align:center; }
+  .diff-side.high { background:rgba(96,165,250,0.12); }
+  .diff-side.low { background:rgba(96,165,250,0.04); }
+  .diff-membrane { width:6px; background:repeating-linear-gradient(to bottom, var(--amber) 0px, var(--amber) 8px, transparent 8px, transparent 14px); flex-shrink:0; position:relative; display:flex; align-items:center; justify-content:center; }
+  .diff-membrane::after { content:'↔'; position:absolute; color:var(--teal); font-size:1.1rem; background:var(--bg); padding:2px; border-radius:50%; }
+  .diff-label { font-size:0.68rem; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:8px; font-weight:700; }
+  .diff-dots { font-size:1.6rem; line-height:1.3; }
+  .diff-conc { font-size:0.75rem; color:var(--muted); margin-top:6px; }
+  .diff-arrow-row { display:flex; align-items:center; justify-content:center; gap:8px; padding:10px; background:var(--surface); border-top:1px solid var(--border); font-size:0.82rem; color:var(--text); }
+
+  /* ── SELF-CHECK (student only) ── */
+  .self-check { background:rgba(0,200,184,0.05); border:1px solid rgba(0,200,184,0.28); border-radius:var(--radius); padding:18px; margin-top:18px; }
+  .sc-header { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .sc-header .sc-icon { font-size:1.1rem; }
+  .sc-header .sc-label { font-size:0.67rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--teal); font-weight:700; }
+  .sc-header .sc-mode { font-size:0.65rem; color:var(--muted); margin-left:auto; }
+  .sc-q { font-size:0.9rem; color:var(--text); font-weight:600; margin-bottom:13px; line-height:1.6; }
+  .sc-opts { display:flex; flex-direction:column; gap:7px; }
+  .sc-opt { background:var(--surface-2); border:1px solid var(--border); border-radius:7px; padding:10px 14px; font-size:0.84rem; cursor:pointer; transition:all 0.15s; text-align:left; font-family:inherit; color:var(--text); width:100%; }
+  .sc-opt:hover:not(:disabled) { border-color:var(--teal); }
+  .sc-opt.correct { background:rgba(74,222,128,0.14); border-color:var(--green); color:var(--green); }
+  .sc-opt.wrong { background:rgba(248,113,113,0.14); border-color:var(--red); color:var(--red); }
+  .sc-feedback { margin-top:11px; font-size:0.83rem; line-height:1.65; display:none; padding:10px 14px; border-radius:7px; }
+  .sc-feedback.show { display:block; }
+  .sc-feedback.ok { background:rgba(74,222,128,0.08); color:var(--green); border:1px solid rgba(74,222,128,0.25); }
+  .sc-feedback.no { background:rgba(248,113,113,0.08); color:var(--red); border:1px solid rgba(248,113,113,0.25); }
+  .sc-reset { display:none; margin-top:10px; }
+  .sc-reset.show { display:flex; justify-content:flex-end; }
+
+  /* Student-only elements hidden in lecture mode */
+  body.lecture .student-only { display:none !important; }
+
+  /* ── LIST ── */
+  ul.clist { list-style:none; padding:0; }
+  ul.clist li { padding:7px 0; border-bottom:1px solid var(--border); font-size:0.85rem; display:flex; gap:9px; align-items:flex-start; }
+  ul.clist li::before { content:'→'; color:var(--teal); flex-shrink:0; }
+
+  /* ── COMPARE TABLE ── */
+  .cmp { width:100%; border-collapse:collapse; margin-top:8px; }
+  .cmp th { padding:9px 13px; text-align:left; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; }
+  .cmp td { padding:8px 13px; border-top:1px solid var(--border); font-size:0.84rem; color:var(--muted); }
+  .cmp td:first-child { color:var(--text); font-weight:600; }
+
+  /* ── BOTTOM NAV ── */
+  #bottomnav { display:flex; justify-content:center; align-items:center; gap:10px; padding:8px 24px; background:var(--surface); border-top:1px solid var(--border); flex-shrink:0; }
+  #dots { display:flex; flex-wrap:wrap; gap:5px; justify-content:center; }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--border); cursor:pointer; transition:all 0.15s; }
+  .dot.active { background:var(--teal); transform:scale(1.45); }
+  .dot:hover { background:var(--muted); }
+
+  /* Lecture mode */
+  body.lecture .lhide { display:none !important; }
+  body.lecture #bottomnav { display:none; }
+
+  ::-webkit-scrollbar { width:5px; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+
+  @media(max-width:860px){
+    .slide{padding:20px;}
+    .cols{flex-direction:column;}
+    .col-side{width:100%;}
+    .grid-4,.tonic-row{grid-template-columns:1fr 1fr;}
+    .title-slide h1{font-size:2.1rem;}
+    #course-id{display:none;}
+    .atp-cycle{grid-template-columns:1fr;}
+  }
+
+/* ── Lightbox ── */
+#lb-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.88);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+#lb-overlay.open { display: flex; }
+#lb-overlay img {
+  max-width: 92vw;
+  max-height: 90vh;
+  border-radius: 10px;
+  box-shadow: 0 8px 48px rgba(0,0,0,0.7);
+  cursor: default;
+  object-fit: contain;
+}
+#lb-close {
+  position: fixed;
+  top: 18px; right: 24px;
+  font-size: 2rem;
+  color: #fff;
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0.8;
+  transition: opacity 0.15s;
+}
+#lb-close:hover { opacity: 1; }
+.img-slot img { cursor: zoom-in; transition: opacity 0.15s; }
+.img-slot img:hover { opacity: 0.85; }
+</style>
+</head>
+<body>
+
+<!-- ══ TOP BAR ══ -->
+<div id="topbar">
+  <div id="course-id">BSC 1005 · General Education Biology</div>
+  <div id="slide-meta"><div class="sname" id="sname"></div></div>
+  <div class="topbar-right">
+    <span id="mode-badge">Student Mode</span>
+    <span id="scount"></span>
+    <button class="btn btn-amber lhide" id="lbtn" onclick="toggleLecture()">🎓 Lecture Mode</button>
+  </div>
+</div>
+<div id="progress"><div id="progress-fill"></div></div>
+
+<!-- ══ DECK ══ -->
+<div id="deck">
+
+  <!-- ─── S1: Title ─── -->
+  <div class="slide title-slide active" id="s1">
+    <div class="course-tag">BSC 1005 · General Education Biology</div>
+    <h1>The <span>Working</span> Cell</h1>
+    <p class="subtitle">Energy, enzymes, and how cells move materials — Chapter 5</p>
+    <div class="pills">
+      <div class="pill" onclick="goTo(2)">Energy &amp; ATP</div>
+      <div class="pill" onclick="goTo(7)">Enzymes</div>
+      <div class="pill" onclick="goTo(10)">Membrane Structure</div>
+      <div class="pill" onclick="goTo(11)">Diffusion &amp; Passive Transport</div>
+      <div class="pill" onclick="goTo(12)">Osmosis &amp; Tonicity</div>
+      <div class="pill" onclick="goTo(14)">Active Transport</div>
+    </div>
+    <div class="img-slot" style="max-width:420px; min-height: 400px;">
+      <img src="images/figure_5.1.jpg"
+      alt="Diagram illustrating energy transformation during diving, showing a diver climbing steps, standing on a platform, diving, and swimming in water."
+      style="width:100%; border-radius: 10px; display: block;">
+     <div class="title-footer">
+      <div class="author-line">Instructor: <span>Alfredo Leon, EdD</span> · Miami Dade College</div>
+      <div class="hint">Click any topic pill to jump to that section · ← → arrow keys to navigate · F for fullscreen</div>
+    </div>
+  </div>
+  </div><!-- /s1 -->
+  <!-- ─── S2: Energy Basics ─── -->
+  <div class="slide" id="s2">
+    <div class="slide-head"><div>
+      <div class="section-tag">Energy Concepts</div>
+      <h2>Kinetic, Potential &amp; Conservation of Energy</h2>
+    </div></div>
+    <div class="cols">
+      <div class="col-main">
+        <p class="body"><span class="key" data-tip="The capacity to cause change — energy can be used to perform work, such as moving an object against an opposing force">Energy</span> makes the world go around — and every living cell run. All forms of energy fall into two categories, and understanding them sets the foundation for everything in this chapter.</p>
+        <div class="ig"><span class="icon">👆</span><div><strong>Click each card</strong> to expand the concept.</div></div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>⚡ Kinetic Energy — the energy of motion</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>Anything that is moving has kinetic energy. A falling diver, flowing electrons, and a molecule vibrating in a cell — all have kinetic energy. Heat is a form of kinetic energy: the random motion of atoms and molecules.</p></div>
+        </div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>🏗️ Potential Energy — stored energy</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>Potential energy is energy an object has because of its location or structure. A diver at the top of a board has potential energy due to position. A glucose molecule has potential energy due to its chemical structure — the arrangement of its atoms stores energy that can be released.</p></div>
+        </div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>♻️ Conservation of Energy — the first law</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>Energy cannot be created or destroyed — only converted from one form to another. A diver converts potential energy to kinetic energy on the way down. A cell converts chemical energy in glucose to ATP. In every case, the total amount of energy stays the same; only the form changes.</p></div>
+        </div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>🌡️ Heat &amp; Entropy — the second law</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p><span class="key" data-tip="A measure of disorder or randomness in a system — entropy always increases during energy conversions">Entropy</span> is a measure of disorder in a system. Every time energy is converted from one form to another, some energy is lost as heat and entropy increases. No energy conversion is 100% efficient — cells included. This is why you get warm when you exercise.</p></div>
+        </div>
+      </div>
+      <div class="col-side">
+        <div class="img-slot" style="flex:1; max-height: 280px;">
+          <div> <img src="images/figure_5.1.jpg"
+              alt="Diagram illustrating energy transformation during diving, showing a diver climbing steps, standing on a platform, diving, and swimming in water. Blue arrows indicate energy changes: climbing converts kinetic to potential energy, platform holds maximum potential energy, diving converts potential to kinetic energy, and water phase has minimal potential energy."
+              style="width:100%; border-radius: 10px; display: block;"> </div>
+          <div class="copy" style="font-size: small; color:#F9FAFB;">© 2019 Pearson Education, Inc. </div>
+        </div>
+        <div class="callout callout-amber">
+          <div class="cl">Connect It</div>
+          <p>When you eat a meal, chemical potential energy in food is converted to kinetic energy (movement), heat (body warmth), and ATP (cellular fuel). All three happen simultaneously.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── S3: Chemical Energy & Cellular Respiration ─── -->
+  <div class="slide" id="s3">
+    <div class="slide-head"><div>
+      <div class="section-tag">Energy Concepts</div>
+      <h2>Chemical Energy &amp; Cellular Respiration</h2>
+    </div></div>
+    <div class="cols">
+      <div class="col-main">
+        <p class="body">The molecules of food, gasoline, and other fuels have a form of potential energy called <span class="key" data-tip="Potential energy stored in the arrangement of atoms in a molecule — released when chemical bonds are broken">chemical energy</span>. Living cells and car engines use the same basic process: break down fuel into smaller waste molecules, releasing energy that can be used to do work.</p>
+        <div class="callout" style="margin-bottom:16px;">
+          <div class="cl">Cellular Respiration</div>
+          <p><span class="key" data-tip="The energy-releasing chemical breakdown of fuel molecules, with the energy stored in a form the cell can use — primarily ATP">Cellular respiration</span> is how cells extract energy from food. Glucose (fuel) + oxygen → carbon dioxide + water + energy (stored as ATP). Humans convert about 34% of food energy into useful work. The rest becomes body heat.</p>
+        </div>
+        <p class="body">Every time energy converts, entropy increases. A cell is never a perfect machine — and that's why you warm up when you work hard.</p>
+        <div class="callout callout-amber">
+          <div class="cl">Food Calories</div>
+          <p>A <span class="key" data-tip="The amount of energy needed to raise 1 gram of water by 1°C">calorie</span> (lowercase) is a tiny unit. Food is measured in Calories (capital C) — which are actually <em>kilocalories</em>, equal to 1,000 calories. That 250 Cal granola bar contains 250,000 calories of chemical energy.</p>
+        </div>
+      </div>
+      <div class="col-side">
+        <div class="img-slot" style="min-height:240px;">
+          <div> <img src="images/figure_5.2.jpg"
+              alt="Diagram comparing energy conversion in a car and a cell, showing fuel rich in chemical energy on the left and waste products poor in chemical energy on the right. Key elements include octane and oxygen for combustion producing heat, kinetic energy, carbon dioxide, and water in a car, and glucose and oxygen for cellular respiration producing heat, ATP, carbon dioxide, and water in a cell."
+              style="width:100%; border-radius: 10px; display: block;"> </div>
+          <div class="copy" style="font-size: small; color:#F9FAFB;">© 2019 Pearson Education, Inc. </div>
+        </div>
+        <div class="img-slot" style="min-height:160px;">
+          <div> <img src="images/figure_5.3.jpg"
+              alt="A horizontal infographic compares calories consumed from various foods with calories burned through different 30-minute activities. It features a red arrow scale from 0 to 500 calories, images of foods like carrot, bread, soda, chocolate, pizza, burger, and meat, and silhouettes depicting activities such as sitting, walking, cycling, swimming, running, and jump roping."
+              style="width:100%; border-radius: 10px; display: block;"> </div>
+          <div class="copy" style="font-size: small; color:#F9FAFB;">© 2019 Pearson Education, Inc. </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── S4: ATP Structure & Function ─── -->
+  <div class="slide" id="s4">
+    <div class="slide-head"><div>
+      <div class="section-tag">Energy Transformations</div>
+      <h2>ATP: The Energy Shuttle</h2>
+    </div></div>
+    <div class="cols">
+      <div class="col-main">
+        <p class="body">Chemical energy released by cellular respiration doesn't go directly into cellular work — it gets stored in molecules of <span class="key" data-tip="Adenosine triphosphate — a molecule that acts as the universal energy currency of the cell">ATP</span>. Think of ATP as a rechargeable battery the cell can spend and refill constantly.</p>
+        <div class="callout" style="margin-bottom:16px;">
+          <div class="cl">ATP Structure</div>
+          <p>ATP = adenosine + a tail of <strong>three phosphate groups</strong>. The bond holding the third (tip) phosphate is high-energy. When that bond breaks, ATP becomes <span class="key" data-tip="Adenosine diphosphate — what ATP becomes after releasing a phosphate group and its energy">ADP</span> + a free phosphate, and energy is released for cellular work.</p>
+        </div>
+        <div class="ig"><span class="icon">👆</span><div><strong>Click each work type</strong> below to see what ATP powers.</div></div>
+        <div class="tabs" id="atp-work-tabs">
+          <button class="tab-btn active" onclick="tab(this,'atp-mech')">⚙️ Mechanical</button>
+          <button class="tab-btn" onclick="tab(this,'atp-trans')">🚪 Transport</button>
+          <button class="tab-btn" onclick="tab(this,'atp-chem')">🧪 Chemical</button>
+        </div>
+        <div id="atp-mech" class="tab-panel active">
+          <div class="tab-content-box">ATP transfers a phosphate group to motor proteins, causing them to change shape and move. This is how muscle fibers slide past each other during contraction — every step you take, every heartbeat, runs on ATP-powered motor proteins.</div>
+        </div>
+        <div id="atp-trans" class="tab-panel">
+          <div class="tab-content-box">ATP energizes transport proteins embedded in cell membranes, enabling them to pump ions and dissolved substances across the membrane — even against concentration gradients. Without this, cells could not maintain their internal chemistry.</div>
+        </div>
+        <div id="atp-chem" class="tab-panel">
+          <div class="tab-content-box">ATP activates reactant molecules by transferring a phosphate group to them, making them reactive enough to participate in the cell's chemical reactions — including building proteins, DNA, and other large molecules.</div>
+        </div>
+      </div>
+      <div class="col-side">
+        <div class="img-slot" style="min-height:fit-content; overflow:hidden;">
+          <div>
+            <img src="images/figure_5.4.jpg"
+            alt="Diagram illustrating ATP hydrolysis process, showing conversion of adenosine triphosphate (ATP) to adenosine diphosphate (ADP) and an inorganic phosphate. Key components include labeled adenosine, phosphate groups, energy release symbolized by a yellow burst, and arrows indicating molecular changes and phosphate transfer."
+            style="width:100%; max-height:180px; object-fit:contain; border-radius:10px; display:block;">
+          </div>
+          <div class="copy" style="font-size:0.7rem; color:#F9FAFB;">© 2019 Pearson Education, Inc.</div>
+        </div>
+
+      <div class="img-slot" style="min-height:fit-content; overflow:hidden;">
+          <div>
+            <img src="images/figure_5.5.jpg"
+            alt="Diagram illustrating three types of cellular work powered by ATP hydrolysis. Panels show motor protein moving muscle fiber, transport protein importing solute across membrane, and chemical reactants forming product, each with ATP converting to ADP and phosphate, highlighting energy transfer and molecular changes."
+            style="width:100%; max-height:300px; object-fit:contain; border-radius:10px; display:block;">
+          </div>
+        <div class="copy" style="font-size:0.7rem; color:#F9FAFB;">© 2019 Pearson Education, Inc.</div>
+      </div>
+        </div>
+    </div>
+  </div>
+
+  <!-- ─── S5: ATP Cycle ─── -->
+  <div class="slide" id="s5">
+    <div class="slide-head"><div>
+      <div class="section-tag">Energy Transformations</div>
+      <h2>The ATP Cycle</h2>
+    </div></div>
+    <div class="full">
+      <p class="body">Cells spend ATP continuously — a working muscle cell consumes and recycles up to <strong>10 million ATP molecules per second</strong>. ATP is not stockpiled; it is constantly rebuilt from ADP using energy from cellular respiration.</p>
+      <div class="ig"><span class="icon">👆</span><div><strong>Click any node</strong> in the cycle to see what's happening at that stage.</div></div>
+
+      <div class="atp-cycle">
+        <div class="cycle-node" id="cn-food" onclick="cycleClick('food')">
+          <div class="cn-title">🍎 Food</div>
+          <div class="cn-sub">glucose &amp; other fuels</div>
+        </div>
+        <div class="cycle-arrow">→</div>
+        <div class="cycle-node" id="cn-resp" onclick="cycleClick('resp')">
+          <div class="cn-title">🔥 Respiration</div>
+          <div class="cn-sub">cellular respiration</div>
+        </div>
+
+        <div class="cycle-label">energy input<br>recharges ADP → ATP</div>
+        <div></div>
+        <div class="cycle-label">energy released<br>ATP → ADP + P</div>
+
+        <div class="cycle-node" id="cn-adp" onclick="cycleClick('adp')">
+          <div class="cn-title">🔋 ADP + P</div>
+          <div class="cn-sub">discharged form</div>
+        </div>
+        <div class="cycle-arrow">←</div>
+        <div class="cycle-node" id="cn-atp" onclick="cycleClick('atp')">
+          <div class="cn-title">⚡ ATP</div>
+          <div class="cn-sub">charged, ready to work</div>
+        </div>
+
+        <div class="cycle-detail" id="cycle-detail">Click any node above to see what happens at that stage of the ATP cycle.</div>
+      </div>
+
+      <div class="grid-2" style="margin-top:16px;">
+        <div class="img-slot" style="min-height:160px;">
+          <div>
+            <img src="images/figure_5.6.jpg"
+            alt="Diagram illustrating cellular respiration cycle, showing conversion of chemical energy from fuel molecules into energy for cellular work. It features yellow circular icons labeled ATP, ADP, and P connected by black arrows, with wavy yellow arrows representing energy flow on both sides."
+            style="width:100%; max-height:300px; object-fit:contain; border-radius:10px; display:block;">
+          </div>
+        <div class="copy" style="font-size:0.7rem; color:#F9FAFB;">© 2019 Pearson Education, Inc.</div>
+        </div>
+        <div class="callout callout-amber" style="margin-bottom:0;">
+          <div class="cl">Scale Check</div>
+          <p>Your body contains about 250g of ATP at any moment — but your cells recycle this supply hundreds of times per day. You produce roughly your body weight in ATP every 24 hours.</p>
+        </div>
+      </div>
+
+      <!-- SELF-CHECK 1 -->
+      <div class="self-check student-only" id="sc1">
+        <div class="sc-header">
+          <span class="sc-icon">🧠</span>
+          <span class="sc-label">Self-Check — Energy &amp; ATP</span>
+          <span class="sc-mode">not graded · check yourself</span>
+        </div>
+        <div class="sc-q">A working muscle cell can consume up to 10 million ATP molecules per second. Where does the energy come from to rebuild ATP from ADP?</div>
+        <div class="sc-opts">
+          <button class="sc-opt" onclick="answer(this,false,'','That\'s not quite right — food energy must first be processed by cellular respiration before it can recharge ATP.')">A) Directly from food molecules in the bloodstream</button>
+          <button class="sc-opt" data-correct="true" onclick="answer(this,true,'Correct. Cellular respiration breaks down fuel molecules like glucose, and the energy released is used to reattach a phosphate group to ADP, regenerating ATP.','')">B) From cellular respiration breaking down fuel molecules</button>
+          <button class="sc-opt" onclick="answer(this,false,'','Free phosphate groups are present, but they have no energy on their own — the energy comes from breaking down fuel through respiration.')">C) From free phosphate groups floating in the cytoplasm</button>
+          <button class="sc-opt" onclick="answer(this,false,'','Heat is a product of energy conversion, not a source for recharging ATP.')">D) From heat generated by muscle movement</button>
+        </div>
+        <div class="sc-feedback" id="sc1-fb"></div>
+        <div class="sc-reset" id="sc1-reset"><button class="btn btn-sm" onclick="resetCheck('sc1')">↺ Try Again</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── S6: Enzymes Overview ─── -->
+  <div class="slide" id="s6">
+    <div class="slide-head"><div>
+      <div class="section-tag">Enzymes</div>
+      <h2>Enzymes &amp; Activation Energy</h2>
+    </div></div>
+    <div class="cols">
+      <div class="col-main">
+        <p class="body"><span class="key" data-tip="The total of all chemical reactions in an organism — most require enzyme assistance">Metabolism</span> is the sum of all chemical reactions in an organism. Most of these reactions do not happen spontaneously at body temperature — they need a push. That push is called <span class="key" data-tip="The energy that must be invested to start a chemical reaction — enzymes lower this barrier">activation energy</span>.</p>
+        <div class="callout" style="margin-bottom:14px;">
+          <div class="cl">What Enzymes Do</div>
+          <p><span class="key" data-tip="Proteins that speed up chemical reactions without being consumed — biological catalysts">Enzymes</span> are proteins that speed up reactions by <strong>lowering the activation energy</strong> required. They are not consumed in the process — they can catalyze the same reaction over and over. All living cells contain thousands of different enzymes, each promoting a specific chemical reaction.</p>
+        </div>
+        <p class="body">Without enzymes, the chemical reactions that sustain life would occur far too slowly — or not at all — at normal body temperatures. Enzymes make life's chemistry possible.</p>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>🌡️ Why activation energy matters</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>Think of activation energy as the energy needed to push a boulder to the top of a hill before it rolls down. Without that initial push, nothing happens. Enzymes lower the hill — the reaction still releases or absorbs the same total energy, but it gets started far more easily.</p></div>
+        </div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>🏷️ Naming enzymes</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>Most enzymes are named after their substrate (the molecule they act on), with an -ase ending. Lactase acts on lactose. Protease acts on proteins. Lipase acts on lipids. This naming convention tells you what an enzyme does immediately.</p></div>
+        </div>
+      </div>
+      <div class="col-side">
+        <div class="img-slot" style="min-height:fit-content">
+          <div>
+            <img src="images/figure_5.7.jpg"
+            alt="Diagram illustrating cellular respiration cycle, showing conversion of chemical energy from fuel molecules into energy for cellular work. It features yellow circular icons labeled ATP, ADP, and P connected by black arrows, with wavy yellow arrows representing energy flow on both sides."
+            style="width:100%; max-height:300px; border-radius:10px; display:block;">
+          </div>
+        <div class="copy" style="font-size:0.7rem; color:#F9FAFB;">© 2019 Pearson Education, Inc.</div>
+        </div>
+        <div class="callout callout-amber">
+          <div class="cl">Analogy</div>
+          <p>An enzyme is like a matchmaker who brings two people together — it lowers the barrier to connection but isn't changed by the encounter and can do it again for the next pair.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── S7: How Enzymes Work ─── -->
+  <div class="slide" id="s7">
+    <div class="slide-head"><div>
+      <div class="section-tag">Enzymes</div>
+      <h2>How Enzymes Work: Active Site &amp; Induced Fit</h2>
+    </div></div>
+    <div class="cols">
+      <div class="col-main">
+        <p class="body">Each enzyme is selective — it recognizes only one specific <span class="key" data-tip="The specific reactant molecule an enzyme acts upon — each enzyme has one">substrate</span>. The key to specificity is the <span class="key" data-tip="The region of an enzyme that binds the substrate — its shape and chemistry are complementary to the substrate">active site</span>: a region shaped and chemically matched to fit that substrate.</p>
+        <div class="ig"><span class="icon">⏩</span><div><strong>Click Next Step</strong> to walk through the four stages of enzyme action.</div></div>
+
+        <div class="stepper">
+          <div class="stepper-top">
+            <div class="step-dots">
+              <div class="sdot active" id="sd0"></div>
+              <div class="sdot" id="sd1"></div>
+              <div class="sdot" id="sd2"></div>
+              <div class="sdot" id="sd3"></div>
+            </div>
+            <span class="step-counter" id="step-counter">Step 1 of 4</span>
+          </div>
+          <div class="stepper-body">
+            <h4 id="step-title">Step 1: Enzyme Ready</h4>
+            <p id="step-desc">The enzyme has an active site with a specific shape and chemistry that matches its substrate. The active site is open and waiting. At this stage, no reaction has occurred.</p>
+          </div>
+          <div class="stepper-footer">
+            <div style="font-size:0.75rem; color:var(--muted);">Lactase acting on lactose</div>
+            <button class="btn btn-teal btn-sm" id="step-btn" onclick="stepNext()">Next Step →</button>
+          </div>
+        </div>
+      </div>
+      <div class="col-side">
+        <div class="img-slot" style="min-height:190px;">
+          <div>
+            <img src="images/figure_5.8.jpg"
+            alt="Lactose active site diagram — shows the enzyme with its active site region highlighted. Illustrates the shape-specific binding region."
+            style="width:100%; max-height:300px; border-radius:10px; display:block;">
+          </div>
+        <div class="copy" style="font-size:0.7rem; color:#F9FAFB;">© 2019 Pearson Education, Inc.</div>
+        </div>
+        <div class="img-slot" style="min-height:190px;">
+          <div>
+            <img src="images/figure_5.9.jpg"
+            alt="Diagram illustrating enzyme-substrate interaction showing lactase enzyme breaking down lactose substrate into glucose and galactose products. Key components include labeled active site, substrate molecules, enzyme shape, and stepwise process with numbered annotations and arrows indicating reaction flow."
+            style="width:100%; max-height:300px; border-radius:10px; display:block;">
+          </div>
+        <div class="copy" style="font-size:0.7rem; color:#F9FAFB;">© 2019 Pearson Education, Inc.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── S8: Enzyme Inhibitors ─── -->
+  <div class="slide" id="s8">
+    <div class="slide-head"><div>
+      <div class="section-tag">Enzymes</div>
+      <h2>Enzyme Inhibitors</h2>
+    </div></div>
+    <div class="cols">
+      <div class="col-main">
+        <p class="body">Certain molecules can disrupt enzyme function by binding to the enzyme and changing its shape so the active site no longer accepts the substrate. These are called <span class="key" data-tip="Molecules that reduce or block enzyme activity by binding to the enzyme and disrupting its function">inhibitors</span>.</p>
+        <div class="ig"><span class="icon">🗂️</span><div><strong>Click each tab</strong> to see how each type of inhibition works.</div></div>
+        <div class="tabs" id="inhib-tabs">
+          <button class="tab-btn active" onclick="tab(this,'inhib-normal')">✅ Normal</button>
+          <button class="tab-btn" onclick="tab(this,'inhib-comp')">🔴 Competitive</button>
+          <button class="tab-btn" onclick="tab(this,'inhib-allo')">🟠 Allosteric</button>
+        </div>
+        <div id="inhib-normal" class="tab-panel active">
+          <div class="tab-content-box">The substrate fits into the active site normally. The enzyme catalyzes the reaction and releases products. No inhibitor is present — the enzyme functions at full capacity.</div>
+        </div>
+        <div id="inhib-comp" class="tab-panel">
+          <div class="tab-content-box"><strong style="color:var(--red);">Competitive inhibition:</strong> A molecule shaped like the substrate plugs up the active site, blocking the real substrate from entering. The inhibitor competes directly with the substrate for the same binding site.<br><br><em>Example: Penicillin blocks the active site of an enzyme bacteria use to build cell walls — killing the bacteria without harming human cells.</em></div>
+        </div>
+        <div id="inhib-allo" class="tab-panel">
+          <div class="tab-content-box"><strong style="color:var(--orange);">Allosteric inhibition:</strong> An inhibitor binds to a site elsewhere on the enzyme (not the active site). This binding changes the enzyme's overall shape, distorting the active site so the substrate can no longer fit.<br><br><em>Example: When a cell produces enough of a product, that product inhibits an enzyme earlier in its own production pathway — keeping the cell from wasting resources.</em></div>
+        </div>
+
+        <div class="callout callout-amber" style="margin-top:14px;">
+          <div class="cl">Inhibitors in Medicine &amp; Daily Life</div>
+          <p>Ibuprofen inhibits an enzyme involved in pain signals. Many cancer drugs inhibit enzymes that promote cell division. Many toxins — including nerve agents — are enzyme inhibitors. Understanding this mechanism explains how both drugs and poisons work.</p>
+        </div>
+      </div>
+      <div class="col-side">
+        <div class="img-slot" style="min-height:auto;">
+           <div>
+            <img src="images/figure_5.10.jpg"
+            alt="Diagram illustrating enzyme-substrate interactions and enzyme inhibition mechanisms. It includes three panels: (a) normal binding of substrate to enzyme active site, (b) enzyme inhibition by substrate imposter blocking active site, and (c) inhibition by molecule altering active site preventing substrate binding, with color-coded shapes representing enzymes, substrates, inhibitors, and active sites."
+            style="width:100%; max-height:300px; border-radius:10px; display:block;">
+          </div>
+        <div class="copy" style="font-size:0.7rem; color:#F9FAFB;">© 2019 Pearson Education, Inc.</div>
+        </div>
+
+        <!-- SELF-CHECK 2 -->
+        <div class="self-check student-only" id="sc2">
+          <div class="sc-header">
+            <span class="sc-icon">🧠</span>
+            <span class="sc-label">Self-Check — Enzymes</span>
+            <span class="sc-mode">not graded · check yourself</span>
+          </div>
+          <div class="sc-q">Penicillin kills bacteria by plugging up the active site of an enzyme bacteria use to build cell walls. This is an example of:</div>
+          <div class="sc-opts">
+            <button class="sc-opt" onclick="answer(this,false,'','Allosteric inhibitors bind away from the active site. Penicillin blocks the active site directly.')">A) Allosteric inhibition</button>
+            <button class="sc-opt" data-correct="true" onclick="answer(this,true,'Correct. Penicillin is a substrate imposter — it fits into the active site and blocks the real substrate, which is competitive inhibition.','')">B) Competitive inhibition</button>
+            <button class="sc-opt" onclick="answer(this,false,'','Enzyme activation would speed the reaction up, not block it.')">C) Enzyme activation</button>
+            <button class="sc-opt" onclick="answer(this,false,'','Facilitated diffusion is a membrane transport process — not related to enzyme inhibition.')">D) Facilitated diffusion</button>
+          </div>
+          <div class="sc-feedback" id="sc2-fb"></div>
+          <div class="sc-reset" id="sc2-reset"><button class="btn btn-sm" onclick="resetCheck('sc2')">↺ Try Again</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── S9: Membrane Structure ─── -->
+  <div class="slide" id="s9">
+    <div class="slide-head"><div>
+      <div class="section-tag">Membrane Function</div>
+      <h2>Membrane Structure &amp; Protein Functions</h2>
+    </div></div>
+    <div class="cols">
+      <div class="col-main">
+        <p class="body">Cells must regulate the flow of materials between their internal environment and the outside world. The <span class="key" data-tip="The membrane surrounding a cell — a phospholipid bilayer with embedded proteins that controls what enters and exits">plasma membrane</span> is the gatekeeper: a double layer of fat (a phospholipid bilayer) with proteins embedded throughout.</p>
+        <p class="body">These membrane proteins carry out specific functions — click each to learn more.</p>
+        <div class="ig"><span class="icon">👆</span><div><strong>Click each protein function</strong> to expand its role.</div></div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>🚪 Transport</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>Transport proteins act as corridors or pumps for specific molecules that cannot cross the lipid bilayer on their own — ions, glucose, water. Some work passively (no energy); others pump molecules actively (requires ATP). This is the most critical function for regulating the cell's internal chemistry.</p></div>
+        </div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>📡 Cell Signaling</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>Signal receptor proteins detect chemical signals from outside the cell (hormones, neurotransmitters) and relay the message to the cell's interior, triggering a response. Insulin receptors on liver cells work this way.</p></div>
+        </div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>🧬 Enzymatic Activity</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>Some membrane proteins are enzymes that catalyze reactions directly at the membrane surface — a useful arrangement for coordinating sequential reactions.</p></div>
+        </div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>🤝 Cell-to-Cell Recognition</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>Glycoproteins on the cell surface act as identity tags — allowing cells to recognize each other. This is critical for immune responses (distinguishing self from foreign) and embryonic development.</p></div>
+        </div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>🔗 Intercellular Joining</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>Some proteins lock adjacent cells together into tissues, providing structural integrity. Others form channels between cells that allow direct chemical communication.</p></div>
+        </div>
+      </div>
+      <div class="col-side">
+        <div class="img-slot" style="min-height:auto;">
+          <div>
+            <img src="images/figure_5.11.jpg"
+            alt="Diagram illustrating cell membrane functions, highlighting protein roles in enzymatic activity, cell signaling, attachment to cytoskeleton and extracellular matrix, transport, intercellular joining, and cell-cell recognition. Key components include phospholipid bilayer, cytoplasm, cytoskeleton, and extracellular matrix, with labeled proteins demonstrating processes like signal relay, substance passage, and cell identification."
+            style="width:100%; max-height:300px; border-radius:10px; display:block;">
+          </div>
+        <div class="copy" style="font-size:0.7rem; color:#F9FAFB;">© 2019 Pearson Education, Inc.</div>
+        </div>
+        <div class="callout callout-amber">
+          <div class="cl">Connect It</div>
+          <p>Many drugs work by targeting membrane proteins directly. Beta-blockers bind to signaling receptors to slow heart rate. HIV hijacks cell-recognition proteins (CD4) to get inside immune cells. Cystic fibrosis is caused by a single defective transport protein — CFTR — that can no longer move chloride ions across the membrane.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── S10: Diffusion & Passive Transport ─── -->
+  <div class="slide" id="s10">
+    <div class="slide-head"><div>
+      <div class="section-tag">Membrane Function</div>
+      <h2>Diffusion &amp; Passive Transport</h2>
+    </div></div>
+    <div class="cols">
+      <div class="col-main">
+        <p class="body">Molecules constantly move. <span class="key" data-tip="The movement of molecules spreading out evenly into available space — from high concentration to low concentration">Diffusion</span> is the net movement of molecules from an area of <strong>higher concentration</strong> to an area of <strong>lower concentration</strong>. No energy is required — molecules naturally move down their <span class="key" data-tip="The difference in concentration of a substance between two areas — molecules naturally move from high to low concentration">concentration gradient</span>.</p>
+
+        <div class="diff-visual">
+          <div class="diff-side high">
+            <div class="diff-label">High Concentration</div>
+            <div class="diff-dots">🔵🔵🔵🔵🔵<br>🔵🔵🔵🔵🔵</div>
+            <div class="diff-conc">Many molecules — more collisions with membrane</div>
+          </div>
+          <div class="diff-membrane"></div>
+          <div class="diff-side low">
+            <div class="diff-label">Low Concentration</div>
+            <div class="diff-dots">🔵🔵<br>🔵</div>
+            <div class="diff-conc">Few molecules — fewer collisions</div>
+          </div>
+        </div>
+        <div class="diff-arrow-row">
+          <span style="color:var(--teal); font-size:1.2rem;">→→→</span>
+          <span>Net movement of molecules is from <strong>high → low</strong> until equilibrium is reached</span>
+        </div>
+
+        <div class="callout" style="margin-top:14px; margin-bottom:12px;">
+          <div class="cl">Passive Transport</div>
+          <p><span class="key" data-tip="Diffusion of a substance across a membrane without the input of energy — the cell does not expend ATP">Passive transport</span> is diffusion across a membrane. Because it follows the concentration gradient, the cell expends no energy. <span class="key" data-tip="A type of passive transport where specific proteins act as channels for molecules that cannot cross the lipid bilayer on their own">Facilitated diffusion</span> is a type of passive transport that uses protein channels — still no energy required, still down the gradient.</p>
+        </div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>🔬 Simple vs. Facilitated Diffusion</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p><strong>Simple diffusion:</strong> Small, nonpolar molecules (O₂, CO₂) pass directly through the phospholipid bilayer without any protein help.<br><br><strong>Facilitated diffusion:</strong> Large or charged molecules (glucose, ions) cannot cross the lipid bilayer directly. They move through specific transport proteins that act as corridors — still passively, still down the gradient, still no ATP.</p></div>
+        </div>
+      </div>
+      <div class="col-side">
+        <div class="img-slot" style="min-height:auto">
+          <div>
+            <img src="images/figure_5.12.jpg"
+            alt="Diagram illustrating passive transport of molecules across a membrane, showing net diffusion and equilibrium stages. Top section depicts one type of molecule (red) diffusing down a concentration gradient, while bottom section shows two types of molecules (red and purple) with bidirectional diffusion and equilibrium."
+            style="width:100%; max-height:300px; border-radius:10px; display:block;">
+          </div>
+        <div class="copy" style="font-size:0.7rem; color:#F9FAFB;">© 2019 Pearson Education, Inc.</div>
+        </div>
+        <div class="callout callout-amber">
+          <div class="cl">Key Distinction</div>
+          <p>Passive transport = no ATP required. The concentration gradient itself is the driving force. Once equilibrium is reached — equal concentration on both sides — net movement stops.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── S11: Osmosis ─── -->
+  <div class="slide" id="s11">
+    <div class="slide-head"><div>
+      <div class="section-tag">Membrane Function</div>
+      <h2>Osmosis &amp; Water Balance</h2>
+    </div></div>
+    <div class="cols">
+      <div class="col-main">
+        <p class="body"><span class="key" data-tip="The diffusion of water across a selectively permeable membrane — water moves from lower solute concentration to higher solute concentration">Osmosis</span> is simply the diffusion of <strong>water</strong> across a membrane. The same rule applies: water moves from where it is more concentrated (fewer solutes) to where it is less concentrated (more solutes) — until equilibrium is reached.</p>
+        <div class="callout" style="margin-bottom:14px;">
+          <div class="cl">Why water moves toward solutes</div>
+          <p>Water molecules are in constant random motion. A region with more dissolved solutes has fewer free water molecules — so fewer collide with and cross the membrane. The net flow of water is always toward higher <span class="key" data-tip="The concentration of dissolved substances in a solution — higher solute = lower effective water concentration">solute concentration</span>.</p>
+        </div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>🧂 Solute, Solvent, Solution — defined</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>A <strong>solute</strong> is the substance dissolved (e.g., salt, sugar). A <strong>solvent</strong> is the liquid doing the dissolving (water in biology). The <strong>solution</strong> is the mixture. In osmosis, water (the solvent) moves across the membrane — solutes typically cannot follow.</p></div>
+        </div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>🌡️ Selectively permeable membrane</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>The plasma membrane allows water to pass through freely (via protein channels called aquaporins) but restricts the movement of most solutes. This selective permeability is what makes osmosis possible — if solutes could cross freely, there would be no osmotic pressure.</p></div>
+        </div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>⚖️ Osmoregulation</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>Animals need to balance water uptake and loss constantly — this is called <span class="key" data-tip="The control of water balance in an organism — regulating the gain and loss of water and dissolved substances">osmoregulation</span>. Saltwater fish, freshwater fish, and terrestrial animals face completely different osmotic challenges and have evolved different osmoregulatory strategies.</p></div>
+        </div>
+      </div>
+      <div class="col-side">
+        <div class="img-slot" style="min-height:auto">
+          <div>
+            <img src="images/figure_5.13.jpg"
+            alt="Diagram illustrating osmosis using a U-shaped tube with selectively permeable membrane separating solutions of varying sugar concentrations. It shows water movement from lower to higher solute concentration (hypotonic to hypertonic) and resulting volume changes, highlighting isotonic equilibrium where concentrations equalize."
+            style="width:100%; max-height:300px; border-radius:10px; display:block;">
+          </div>
+        <div class="copy" style="font-size:0.7rem; color:#F9FAFB;">© 2019 Pearson Education, Inc.</div>
+        </div>
+        <div class="callout callout-amber" style="margin-top:14px;">
+          <div class="cl">Analogy</div>
+          <p>Water always moves toward the crowd. The side with more solute has fewer "free" water molecules — so water flows across the membrane to balance things out, not because it's being pushed, but because that's where it's needed most.</p>
+        </div>
+      </div>
+      </div>
+    </div>
+
+  <!-- ─── S12: Tonicity ─── -->
+  <div class="slide" id="s12">
+    <div class="slide-head"><div>
+      <div class="section-tag">Membrane Function</div>
+      <h2>Tonicity: What Happens to Cells in Solution</h2>
+    </div></div>
+    <div class="full">
+      <p class="body"><span class="key" data-tip="The ability of a solution to cause a cell to gain or lose water by osmosis — determined by comparing solute concentrations inside and outside the cell">Tonicity</span> describes how a solution affects a cell's water balance. Three terms describe the three possibilities: <strong>isotonic</strong>, <strong>hypotonic</strong>, and <strong>hypertonic</strong>.</p>
+
+      <div class="ig"><span class="icon">👆</span><div><strong>Toggle between cell types</strong> to see how each responds differently to the same solutions.</div>
+    </div>
+
+      <div class="tonic-toggle">
+        <button class="tonic-btn active" id="tb-animal" onclick="setTonic('animal')">🐾 Animal Cell (e.g., red blood cell)</button>
+        <button class="tonic-btn" id="tb-plant" onclick="setTonic('plant')">🌿 Plant Cell</button>
+      </div>
+
+      <div class="tonic-panel active" id="tp-animal">
+        <div class="tonic-row">
+          <div class="tonic-card iso">
+            <div class="tc-label">Isotonic Solution</div>
+            <div class="tc-cell">🔴</div>
+            <div class="tc-desc">Equal solute concentration inside and outside. No net movement of water.</div>
+            <div class="tc-result">Normal — cell keeps its shape</div>
+          </div>
+          <div class="tonic-card hypo">
+            <div class="tc-label">Hypotonic Solution</div>
+            <div class="tc-cell">🫧</div>
+            <div class="tc-desc">Lower solute outside than inside. Water rushes INTO the cell by osmosis.</div>
+            <div class="tc-result">Cell swells → may burst (lyse)</div>
+          </div>
+          <div class="tonic-card hyper">
+            <div class="tc-label">Hypertonic Solution</div>
+            <div class="tc-cell">🫙</div>
+            <div class="tc-desc">Higher solute outside than inside. Water leaves the cell by osmosis.</div>
+            <div class="tc-result">Cell shrivels (crenates)</div>
+          </div>
+        </div>
+        <div class="callout callout-amber">
+          <div class="cl">Real-World Example</div>
+          <p>IV fluids given in hospitals are carefully formulated to be isotonic with blood — so red blood cells neither burst nor shrivel. An accidental hypertonic or hypotonic IV can be fatal.</p>
+        </div>
+      </div>
+
+      <div class="tonic-panel" id="tp-plant">
+        <div class="tonic-row">
+          <div class="tonic-card iso">
+            <div class="tc-label">Isotonic Solution</div>
+            <div class="tc-cell">🌱</div>
+            <div class="tc-desc">No net water movement. Cell is flaccid — the membrane is not pressed against the rigid cell wall.</div>
+            <div class="tc-result">Limp — not ideal for plants</div>
+          </div>
+          <div class="tonic-card hypo">
+            <div class="tc-label">Hypotonic Solution</div>
+            <div class="tc-cell">💪</div>
+            <div class="tc-desc">Water enters the cell. The rigid cell wall resists bursting. The cell becomes firm — this is called turgor pressure.</div>
+            <div class="tc-result">Turgid — optimal for plants</div>
+          </div>
+          <div class="tonic-card hyper">
+            <div class="tc-label">Hypertonic Solution</div>
+            <div class="tc-cell">🥀</div>
+            <div class="tc-desc">Water leaves the cell. The membrane pulls away from the cell wall (plasmolysis). Unlike animal cells, the wall doesn't collapse — but the cell usually dies.</div>
+            <div class="tc-result">Plasmolysis — cell death</div>
+          </div>
+        </div>
+        <div class="callout callout-amber">
+          <div class="cl">Real-World Example</div>
+          <p>A wilting plant needs water because its cells have lost turgor pressure — they're in a relatively hypertonic environment. Watering restores the hypotonic conditions that make plant cells turgid and stems upright.</p>
+        </div>
+      </div>
+
+      <!-- SELF-CHECK 3 -->
+      <div class="self-check student-only" id="sc3">
+        <div class="sc-header">
+          <span class="sc-icon">🧠</span>
+          <span class="sc-label">Self-Check — Osmosis &amp; Tonicity</span>
+          <span class="sc-mode">not graded · check yourself</span>
+        </div>
+        <div class="sc-q">A plant left without water begins to wilt. At the cellular level, what is happening?</div>
+        <div class="sc-opts">
+          <button class="sc-opt" onclick="answer(this,false,'','That describes a hypotonic environment — too much water entering. A wilting plant has the opposite problem.')">A) Plant cells are taking in too much water and swelling</button>
+          <button class="sc-opt" data-correct="true" onclick="answer(this,true,'Correct. Without water, the soil becomes relatively hypertonic. Water leaves the cells by osmosis, reducing turgor pressure. The plasma membrane pulls away from the cell wall — the plant wilts and may eventually die.','')">B) Plant cells are losing water, causing the plasma membrane to pull away from the cell wall</button>
+          <button class="sc-opt" onclick="answer(this,false,'','ATP production is affected by water stress, but that\'s a consequence — the direct cause of wilting is loss of turgor pressure from water moving out by osmosis.')">C) Plant cells are producing less ATP due to water stress</button>
+          <button class="sc-opt" onclick="answer(this,false,'','Cell walls are rigid structures made of cellulose — they don\'t dissolve when the plant loses water.')">D) The cell walls are dissolving due to dehydration</button>
+        </div>
+        <div class="sc-feedback" id="sc3-fb"></div>
+        <div class="sc-reset" id="sc3-reset"><button class="btn btn-sm" onclick="resetCheck('sc3')">↺ Try Again</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── S13: Active Transport ─── -->
+  <div class="slide" id="s13">
+    <div class="slide-head"><div>
+      <div class="section-tag">Membrane Function</div>
+      <h2>Active Transport</h2>
+    </div></div>
+    <div class="cols">
+      <div class="col-main">
+        <p class="body">Passive transport moves molecules <em>down</em> their concentration gradient — no energy needed. <span class="key" data-tip="Movement of molecules across a membrane against the concentration gradient — from low to high concentration — requires ATP energy">Active transport</span> does the opposite: it moves molecules <em>against</em> the gradient, from low concentration to high concentration. That's uphill work, and it requires energy — specifically ATP.</p>
+
+        <div class="card" style="margin-bottom:14px;">
+          <h4 style="color:var(--teal);">Passive vs. Active Transport</h4>
+          <table class="cmp">
+            <tr><th style="color:var(--teal);">Feature</th><th style="color:var(--blue);">Passive</th><th style="color:var(--amber);">Active</th></tr>
+            <tr><td>Direction</td><td style="color:var(--blue);">High → Low (down gradient)</td><td style="color:var(--amber);">Low → High (against gradient)</td></tr>
+            <tr><td>ATP Required?</td><td style="color:var(--blue);">No</td><td style="color:var(--amber);">Yes</td></tr>
+            <tr><td>Protein needed?</td><td style="color:var(--blue);">Sometimes (facilitated)</td><td style="color:var(--amber);">Always (transport protein/pump)</td></tr>
+            <tr><td>Example</td><td style="color:var(--blue);">O₂ into cells, glucose</td><td style="color:var(--amber);">Na⁺/K⁺ pump in nerve cells</td></tr>
+          </table>
+        </div>
+
+        <div class="callout callout-amber">
+          <div class="cl">Why Active Transport Matters</div>
+          <p>Active transport allows cells to maintain internal concentrations that differ dramatically from their surroundings — critical for nerve impulses, muscle contraction, and regulating cell volume. Your nerve cells couldn't fire without the sodium-potassium pump running constantly on ATP.</p>
+        </div>
+      </div>
+      <div class="col-side">
+        <div class="img-slot" style="min-height:auto;">
+          <div>
+            <img src="images/figure_5.14.jpg"
+            alt="Active transport diagram — solute molecules moving from lower to higher concentration. Purple transport protein, yellow ATP symbol, orange solute particles, arrows showing movement against gradient."
+            style="width:100%; max-height:300px; border-radius:10px; display:block;">
+          </div>
+        <div class="copy" style="font-size:0.7rem; color:#F9FAFB;">© 2019 Pearson Education, Inc.</div>
+ 
+        </div>
+        <div class="callout">
+          <div class="cl">Think About It</div>
+          <p>Your kidneys use active transport to reclaim glucose from urine back into the blood. Some diabetes drugs work by blocking this process, causing excess glucose to be lost in urine.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── S14: Exocytosis, Endocytosis & Evolution ─── -->
+  <div class="slide" id="s14">
+    <div class="slide-head"><div>
+      <div class="section-tag">Membrane Function</div>
+      <h2>Bulk Transport &amp; the Origin of Membranes</h2>
+    </div></div>
+    <div class="cols">
+      <div class="col-main">
+        <p class="body">Individual molecules cross membranes through channels and pumps. Large molecules — proteins, polysaccharides, even whole pathogens — require a different mechanism: bulk transport using membranous vesicles.</p>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>📤 Exocytosis — moving OUT</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>In exocytosis, the cell packages materials into vesicles (membrane-enclosed sacs) that fuse with the plasma membrane, expelling their contents outside. This is how cells secrete hormones, neurotransmitters, and digestive enzymes.</p></div>
+        </div>
+        <div class="expand" onclick="expand(this)">
+          <div class="expand-head"><h4>📥 Endocytosis — moving IN</h4><span class="expand-icon">+</span></div>
+          <div class="expand-body"><p>In endocytosis, the plasma membrane engulfs material by budding inward, forming a vesicle inside the cell. White blood cells use a form called phagocytosis to engulf and destroy bacteria. Cells also take in specific molecules via receptor-mediated endocytosis.</p></div>
+        </div>
+
+        <div class="callout" style="margin-top:16px; margin-bottom:14px;">
+          <div class="cl">Evolution Connection: The Origin of Membranes</div>
+          <p>Phospholipids — the key ingredient of membranes — were likely among the first organic compounds to form on early Earth. In water, phospholipids spontaneously self-assemble into simple membranes. This tendency is why life could begin: a membrane-enclosed collection of molecules is the first step toward a cell. Every cell on Earth today is enclosed by a plasma membrane that is similar in structure and function — illustrating the evolutionary unity of life.</p>
+        </div>
+
+        <div class="callout callout-amber">
+          <div class="cl">Biomedical Application</div>
+          <p>Biomedical engineers produce <em>liposomes</em> — artificial membrane vesicles — that can carry drugs or nutrients to specific sites in the body. mRNA COVID vaccines were delivered inside lipid nanoparticles using exactly this principle.</p>
+        </div>
+      </div>
+      <div class="col-side">
+        <div class="card">
+          <h4 style="color:var(--teal); margin-bottom:14px;">Chapter 5 in One Diagram</h4>
+          <ul class="clist">
+            <li>Cells run on <strong>ATP</strong> — built by cellular respiration</li>
+            <li><strong>Enzymes</strong> make reactions fast enough to sustain life</li>
+            <li><strong>Passive transport</strong> moves molecules down gradients, no ATP</li>
+            <li><strong>Osmosis</strong> is passive transport of water</li>
+            <li><strong>Tonicity</strong> determines water gain or loss in cells</li>
+            <li><strong>Active transport</strong> moves molecules against gradients, needs ATP</li>
+            <li><strong>Vesicles</strong> handle bulk movement in and out</li>
+          </ul>
+        </div>
+        <div class="callout" style="margin-top:14px;">
+          <div class="cl">Connecting to Chapter 1</div>
+          <p>Recall the major theme: <em>Structure/Function</em>. Every membrane protein, every enzyme active site, and every transport mechanism in this chapter is another example of structure determining function.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── S15: Review ─── -->
+  <div class="slide" id="s15">
+    <div class="slide-head"><div>
+      <div class="section-tag">Chapter 5 — Summary</div>
+      <h2>The Working Cell: Pulling It Together</h2>
+    </div></div>
+    <div class="full">
+      <div class="grid-2" style="margin-bottom:16px;">
+        <div class="card" style="border-top:3px solid var(--yellow);">
+          <h4 style="color:var(--yellow);">⚡ Energy &amp; ATP</h4>
+          <ul class="clist" style="margin-top:8px;">
+            <li>Kinetic, potential, chemical energy — all interconvertible</li>
+            <li>ATP is the cell's universal energy currency</li>
+            <li>ATP → ADP + P releases energy for three types of cellular work</li>
+            <li>Cellular respiration constantly recharges ADP back to ATP</li>
+          </ul>
+        </div>
+        <div class="card" style="border-top:3px solid var(--pink);">
+          <h4 style="color:var(--pink);">⚗️ Enzymes</h4>
+          <ul class="clist" style="margin-top:8px;">
+            <li>Lower activation energy without being consumed</li>
+            <li>Active site + substrate → induced fit → products released</li>
+            <li>Inhibitors (competitive or allosteric) block enzyme function</li>
+            <li>Many drugs and toxins work by inhibiting enzymes</li>
+          </ul>
+        </div>
+        <div class="card" style="border-top:3px solid var(--blue);">
+          <h4 style="color:var(--blue);">↔️ Passive Transport &amp; Osmosis</h4>
+          <ul class="clist" style="margin-top:8px;">
+            <li>Diffusion moves molecules from high → low concentration</li>
+            <li>No ATP required — concentration gradient drives the movement</li>
+            <li>Osmosis = diffusion of water across a membrane</li>
+            <li>Tonicity: iso / hypo / hypertonic determine water gain or loss</li>
+          </ul>
+        </div>
+        <div class="card" style="border-top:3px solid var(--amber);">
+          <h4 style="color:var(--amber);">⬆️ Active Transport &amp; Bulk Movement</h4>
+          <ul class="clist" style="margin-top:8px;">
+            <li>Active transport moves molecules against gradient — needs ATP</li>
+            <li>Allows cells to maintain internal chemistry different from surroundings</li>
+            <li>Exocytosis (out) and endocytosis (in) handle large molecules</li>
+            <li>Membranes are ancient — phospholipids self-assemble spontaneously</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout" style="margin-bottom:14px;">
+        <div class="cl">The Through-Line</div>
+        <p>Every concept in this chapter connects back to one idea: <strong>cells must do work to stay alive</strong>. Energy is required, enzymes make chemistry fast enough, and membranes regulate what enters and exits. Remove any one of these and the cell fails.</p>
+      </div>
+
+      <div class="student-only" style="background:rgba(0,200,184,0.05); border:1px solid rgba(0,200,184,0.2); border-radius:var(--radius); padding:16px; text-align:center;">
+        <div style="font-size:0.7rem; text-transform:uppercase; letter-spacing:1.5px; color:var(--teal); font-weight:700; margin-bottom:8px;">You've reached the end of Chapter 5</div>
+        <p style="font-size:0.86rem; color:var(--muted); margin-bottom:14px;">Review the three self-checks embedded in slides 5, 8, and 12 — or use the dot navigation below to revisit any section.</p>
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+          <button class="btn btn-sm" onclick="goTo(5)">↺ Energy self-check (Slide 5)</button>
+          <button class="btn btn-sm" onclick="goTo(8)">↺ Enzymes self-check (Slide 8)</button>
+          <button class="btn btn-sm" onclick="goTo(12)">↺ Tonicity self-check (Slide 12)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end deck -->
+
+<!-- ══ BOTTOM NAV ══ -->
+<div id="bottomnav">
+  <button class="btn lhide" id="prev" onclick="go(-1)" disabled>← Prev</button>
+  <div id="dots"></div>
+  <button class="btn lhide" id="next" onclick="go(1)">Next →</button>
+</div>
+
+<script>
+const TOTAL = 15;
+let cur = 1, lmode = false;
+
+const titles = [
+  "The Working Cell","Energy: Kinetic & Potential",
+  "Chemical Energy & Cellular Respiration","ATP: The Energy Shuttle",
+  "The ATP Cycle","Enzymes & Activation Energy",
+  "How Enzymes Work","Enzyme Inhibitors",
+  "Membrane Structure & Function","Diffusion & Passive Transport",
+  "Osmosis & Water Balance","Tonicity: Cells in Solution",
+  "Active Transport","Bulk Transport & Origin of Membranes",
+  "Chapter 5 Summary"
+];
+
+// Dots
+const dotsEl = document.getElementById('dots');
+for (let i=1;i<=TOTAL;i++) {
+  const d = document.createElement('div');
+  d.className = 'dot'+(i===1?' active':'');
+  d.title = titles[i-1];
+  d.onclick = () => goTo(i);
+  d.id = 'd'+i;
+  dotsEl.appendChild(d);
+}
+
+function goTo(n) {
+  if(n<1||n>TOTAL) return;
+  document.getElementById('s'+cur).classList.remove('active');
+  document.getElementById('d'+cur).classList.remove('active');
+  cur=n;
+  document.getElementById('s'+cur).classList.add('active');
+  document.getElementById('d'+cur).classList.add('active');
+  sync();
+}
+function go(dir){goTo(cur+dir);}
+
+function sync(){
+  document.getElementById('prev').disabled = cur===1;
+  document.getElementById('next').disabled = cur===TOTAL;
+  document.getElementById('sname').textContent = titles[cur-1];
+  document.getElementById('scount').textContent = cur+' / '+TOTAL;
+  document.getElementById('progress-fill').style.width = (cur/TOTAL*100)+'%';
+}
+
+function toggleLecture(){
+  lmode=!lmode;
+  document.body.classList.toggle('lecture',lmode);
+  document.getElementById('lbtn').textContent = lmode?'📖 Exit Lecture Mode':'🎓 Lecture Mode';
+  document.getElementById('mode-badge').textContent = lmode?'Lecture Mode':'Student Mode';
+}
+
+document.addEventListener('keydown',e=>{
+  if(['ArrowRight','ArrowDown',' '].includes(e.key)){e.preventDefault();go(1);}
+  else if(['ArrowLeft','ArrowUp'].includes(e.key)){e.preventDefault();go(-1);}
+  else if(e.key==='f'||e.key==='F'){document.documentElement.requestFullscreen?.();}
+});
+
+// Expand
+function expand(el){el.classList.toggle('open');}
+
+// Tabs (scoped to slide)
+function tab(btn,id){
+  const slide=btn.closest('.slide');
+  slide.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  slide.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(id).classList.add('active');
+}
+
+// Tonicity toggle
+function setTonic(type){
+  document.getElementById('tb-animal').classList.toggle('active',type==='animal');
+  document.getElementById('tb-plant').classList.toggle('active',type==='plant');
+  document.getElementById('tp-animal').classList.toggle('active',type==='animal');
+  document.getElementById('tp-plant').classList.toggle('active',type==='plant');
+}
+
+// Enzyme stepper
+const steps=[
+  {title:"Step 1: Enzyme Ready",desc:"The enzyme has an active site with a specific shape and chemistry that fits only its target substrate. The active site is open and waiting. At this stage, no reaction has occurred — the enzyme is ready."},
+  {title:"Step 2: Substrate Binds — Induced Fit",desc:"The substrate (lactose) enters the active site. The enzyme changes shape slightly to fit snugly around the substrate — this is called induced fit. The fit is precise: this enzyme will only accept lactose, not other sugars."},
+  {title:"Step 3: Catalysis",desc:"The enzyme promotes the chemical reaction. Lactase uses a water molecule to break lactose into its two components: glucose and galactose. The energy required (activation energy) is dramatically lower with the enzyme's help."},
+  {title:"Step 4: Products Released",desc:"Glucose and galactose are released from the active site. The enzyme returns to its original shape, fully intact and ready to accept another lactose molecule. A single enzyme can catalyze thousands of reactions per second."}
+];
+let stepIdx=0;
+
+function stepNext(){
+  stepIdx=(stepIdx+1)%steps.length;
+  const s=steps[stepIdx];
+  document.getElementById('step-title').textContent=s.title;
+  document.getElementById('step-desc').textContent=s.desc;
+  document.getElementById('step-counter').textContent='Step '+(stepIdx+1)+' of '+steps.length;
+  document.getElementById('step-btn').textContent=stepIdx===steps.length-1?'↺ Restart':'Next Step →';
+  for(let i=0;i<steps.length;i++){
+    document.getElementById('sd'+i).classList.toggle('active',i===stepIdx);
+  }
+}
+
+// ATP cycle
+const cycleText={
+  food:"Food molecules (glucose and others) contain chemical potential energy stored in the bonds between atoms. This energy was originally captured from sunlight by plants through photosynthesis.",
+  resp:"Cellular respiration breaks down fuel molecules, releasing their chemical energy. This energy is captured and used to reattach a phosphate group to ADP, regenerating ATP. CO₂ and water are released as waste products.",
+  atp:"ATP (adenosine triphosphate) is the charged, ready-to-use form. When a cell needs to do work, it hydrolyzes ATP — breaking the bond holding the third phosphate — releasing energy instantly wherever it's needed.",
+  adp:"After releasing energy, ATP becomes ADP (adenosine diphosphate) + a free phosphate group. ADP is the discharged form. It's immediately recycled — cellular respiration reattaches the phosphate and recharges it back to ATP."
+};
+function cycleClick(key){
+  document.querySelectorAll('.cycle-node').forEach(n=>n.classList.remove('active'));
+  document.getElementById('cn-'+key).classList.add('active');
+  document.getElementById('cycle-detail').textContent=cycleText[key];
+}
+
+// Self-check
+function answer(btn,correct,okMsg,noMsg){
+  const sc=btn.closest('.self-check');
+  const id=sc.id;
+  sc.querySelectorAll('.sc-opt').forEach(b=>{b.disabled=true;b.style.cursor='default';});
+  const fb=document.getElementById(id+'-fb');
+  const rst=document.getElementById(id+'-reset');
+  if(correct){
+    btn.classList.add('correct');
+    fb.textContent=okMsg;
+    fb.className='sc-feedback show ok';
+  } else {
+    btn.classList.add('wrong');
+    fb.textContent=noMsg;
+    fb.className='sc-feedback show no';
+    sc.querySelectorAll('.sc-opt').forEach(b=>{if(b.dataset.correct==='true')b.classList.add('correct');});
+  }
+  rst.classList.add('show');
+}
+function resetCheck(id){
+  const sc=document.getElementById(id);
+  sc.querySelectorAll('.sc-opt').forEach(b=>{b.disabled=false;b.classList.remove('correct','wrong');b.style.cursor='pointer';});
+  document.getElementById(id+'-fb').className='sc-feedback';
+  document.getElementById(id+'-reset').classList.remove('show');
+}
+
+sync();
+</script>
+
+<!-- Lightbox overlay -->
+<div id="lb-overlay" role="dialog" aria-modal="true" aria-label="Image viewer">
+  <span id="lb-close" aria-label="Close" onclick="lbClose()">✕</span>
+  <img id="lb-img" src="" alt="">
+</div>
+
+<script>
+// Lightbox
+const lbOverlay = document.getElementById('lb-overlay');
+const lbImg     = document.getElementById('lb-img');
+
+document.querySelectorAll('.img-slot img').forEach(img => {
+  img.addEventListener('click', e => {
+    e.stopPropagation();
+    lbImg.src = img.src;
+    lbImg.alt = img.alt;
+    lbOverlay.classList.add('open');
+    document.addEventListener('keydown', lbKeyHandler);
+  });
+});
+
+lbOverlay.addEventListener('click', lbClose);
+lbImg.addEventListener('click', e => e.stopPropagation());
+
+function lbClose() {
+  lbOverlay.classList.remove('open');
+  lbImg.src = '';
+  document.removeEventListener('keydown', lbKeyHandler);
+}
+
+function lbKeyHandler(e) {
+  if (e.key === 'Escape') lbClose();
+}
+</script>
+</body>
+</html>
